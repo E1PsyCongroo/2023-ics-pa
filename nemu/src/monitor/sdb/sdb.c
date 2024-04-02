@@ -17,15 +17,13 @@
 #include <cpu/cpu.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <memory/vaddr.h>
 #include <memory/paddr.h>
 #include "sdb.h"
 #include "common.h"
 #include "utils.h"
 
 static int is_batch_mode = false;
-
-void init_regex();
-void init_wp_pool();
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char* rl_gets() {
@@ -157,10 +155,15 @@ static int cmd_x(char *args) {
     printf("Invalid expression\n");
     return 0;
   }
+  if (!in_pmem(expr_val)) {
+    printf("address = " FMT_WORD " is out of bound of pmem [" FMT_PADDR ", " FMT_PADDR "]\n",
+      expr_val, PMEM_LEFT, PMEM_RIGHT);
+    return 0;
+  }
   printf(FMT_WORD ":", expr_val);
   for (size_t i = 0; i < n; i++) {
     if (i % 4 == 0) { putchar('\n'); }
-    read = (uint32_t)paddr_read(expr_val, 4);
+    read = (uint32_t)vaddr_read(expr_val, 4);
     printf("0x%08x ", read);
     expr_val += 4;
   }

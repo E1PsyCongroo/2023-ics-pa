@@ -14,6 +14,7 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include <memory/vaddr.h>
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
@@ -23,21 +24,14 @@
 enum {
   TK_NOTYPE = 256, TK_EQ,
   TK_NUM, TK_NEG,
-  TK_REG, TK_REF,
+  TK_REG, TK_DEREF,
   TK_NEQ, TK_AND,
-  /* TODO: Add more token types */
-
 };
 
 static struct rule {
   const char *regex;
   int token_type;
 } rules[] = {
-
-  /* TODO: Add more rules.
-   * Pay attention to the precedence level of different rules.
-   */
-
   {" +", TK_NOTYPE},                              // spaces
   {"\\+", '+'},                                   // plus
   {"-", '-'},                                     // minus
@@ -45,12 +39,11 @@ static struct rule {
   {"/", '/'},                                     // divide
   {"\\(", '('},                                   // left bracket
   {"\\)", ')'},                                   // right bracket
-  {"0(x[0-9a-f]+|X[0-9A-F]+)|[0-9]+", TK_NUM},    // decimal number
   {"==", TK_EQ},                                  // equal
   {"!=", TK_NEQ},                                 // not equal
-  {"&&", TK_AND},                                 // and
-  {"\\*", TK_REF},                                // reference
-  {"\\$[^ ]+", TK_REG},                           // register
+  {"&&", TK_AND},                                 // anD
+  {"0(x[0-9a-f]+|X[0-9A-F]+)|[0-9]+", TK_NUM},    // number
+  {"\\$[$a-zA-Z]+[a-zA-Z0-9]*", TK_REG},          // register
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -102,20 +95,16 @@ static bool make_token(char *e) {
 
         position += substr_len;
 
-        /* TODO: Now a new token is recognized with rules[i]. Add codes
-         * to record the token in the array `tokens'. For certain types
-         * of tokens, some extra actions should be performed.
-         */
-
         tokens[nr_token].type = rules[i].token_type;
         switch (rules[i].token_type) {
           case TK_NOTYPE: break;
           case '+': case '-': case '*': case '/':
-          case '(': case ')': case TK_EQ:
+          case '(': case ')': case TK_EQ: case TK_NEQ:
+          case TK_AND:
             nr_token++;
             break;
           case TK_NUM: case TK_REG:
-            if (substr_len >= 32) assert(0);
+            if (substr_len >= 32) { TODO(); }
             strncpy(tokens[nr_token].str, substr_start, substr_len);
             tokens[nr_token++].str[substr_len] = '\0';
             break;
@@ -152,23 +141,38 @@ static bool check_parentheses(int p, int q) {
   return !waiting_matched_backet;
 }
 
+static struct PriorityMap {
+    int type;
+    int priority;
+} priority_map[] = {
+  {TK_AND, 4},
+  {TK_EQ, 3}, {TK_NEQ, 3},
+  {'+', 2}, {'-', 2},
+  {'*', 1}, {'/', 1},
+};
+
+static bool priority_change(int token_type, int *current_priority) {
+  for (int i = 0; i < ARRLEN(priority_map); i++) {
+    if (token_type == priority_map[i].type && *current_priority <= priority_map[i].priority) {
+      *current_priority = priority_map[i].priority;
+      return true;
+    }
+  }
+  return false;
+}
+
 static int find_pivot(int left, int right, bool *success) {
   int waiting_matched_backet = 0, pivot_index = 0;
   int current_priority = 0;
   for (int i = left; i <= right; i++) {
-    switch (tokens[i].type)
-    {
-    case TK_NEG: case TK_NUM:
+    switch (tokens[i].type) {
+    case TK_NEG: case TK_NUM: case TK_REG: case TK_DEREF:
       continue;
+    case TK_AND:
+    case TK_EQ: case TK_NEQ:
     case '+': case '-':
-      if (!waiting_matched_backet && current_priority <= 2) {
-        current_priority = 2;
-        pivot_index = i;
-      }
-      break;
     case '*': case '/':
-      if (!waiting_matched_backet && current_priority <= 1) {
-        current_priority = 1;
+      if (!waiting_matched_backet && priority_change(tokens[i].type, &current_priority)) {
         pivot_index = i;
       }
       break;
@@ -208,8 +212,18 @@ static word_t eval(int left, int right, bool *success) {
         return 0;
     }
   }
-  else if (left == right - 1 && tokens[left].type == TK_NEG) {
-    return -eval(left+1, right, success);
+  else if (left == right - 1) {
+    switch (tokens[left].type) {
+      case TK_NEG: return -eval(left+1, right, success);
+      case TK_DEREF:
+        vaddr_t paddr = eval(left+1, right, success);
+        if (*success) {
+          return vaddr_read(paddr, MUXDEF(CONFIG_ISA64, 8, 4));
+        }
+      default:
+        *success = false;
+        return 0;
+    }
   }
   else {
     int op_index = find_pivot(left, right, success);
@@ -227,20 +241,25 @@ static word_t eval(int left, int right, bool *success) {
           return 0;
         }
         return val1 / val2;
-      default: TODO();
+      case TK_EQ: return val1 == val2;
+      case TK_NEQ: return val1 != val2;
+      case TK_AND: return val1 && val2;
+      default:
+        *success = false;
+        return 0;
     }
   }
 }
 
-static bool is_neg(int i) {
-  return tokens[i].type == '-' &&
-  (i == 0 || (tokens[i-1].type != TK_NUM && tokens[i-1].type != ')'));
+static bool is_unary(int i, int search_type) {
+  return tokens[i].type == search_type &&
+  (i == 0 || (tokens[i-1].type != TK_NUM && tokens[i-1].type != ')' && tokens[i-1].type != TK_REG));
 }
 
-static void check_neg(void) {
+static void check_unary(int search_type, int replace_type) {
   for (int i = 0; i < nr_token; i++) {
-    if (is_neg(i)) {
-      tokens[i].type = TK_NEG;
+    if (is_unary(i, search_type)) {
+      tokens[i].type = replace_type;
     }
   }
 }
@@ -250,7 +269,8 @@ word_t expr(char *e, bool *success) {
     *success = false;
     return 0;
   }
-  check_neg();
+  check_unary('-', TK_NEG);
+  check_unary('*', TK_DEREF);
   *success = true;
   return eval(0, nr_token-1, success);
 }
