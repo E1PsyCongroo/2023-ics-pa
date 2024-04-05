@@ -111,8 +111,9 @@ static int cmd_help(char *args) {
 static int cmd_si(char *args) {
   char *arg = strtok(NULL, "");
   uint64_t n = 1;
-  if (arg && !(n = (uint64_t)atoll(arg))) {
+  if (arg && !sscanf(arg, "%" PRIu64, &n)) {
     printf("Unknown args '%s'\n", arg);
+    return 0;
   }
   cpu_exec(n);
   return 0;
@@ -128,7 +129,7 @@ static int cmd_info(char *args) {
     isa_reg_display();
   }
   else if (!strcmp(arg, "w")) {
-    TODO();
+    wp_display();
   }
   else {
     printf("Unknow args '%s'\n", arg);
@@ -170,6 +171,7 @@ static int cmd_x(char *args) {
   putchar('\n');
   return 0;
 }
+
 static int cmd_p(char *args) {
   bool success;
   word_t result = expr(args, &success);
@@ -183,12 +185,30 @@ static int cmd_p(char *args) {
 }
 
 static int cmd_w(char *args) {
-  TODO();
+  char *arg = strtok(NULL, "");
+  if (!arg) {
+    printf("Argument required (expression to compute).\n");
+    return 0;
+  }
+  if (!add_wp(arg)){
+    printf("Invalid expression\n");
+  }
   return 0;
 }
 
 static int cmd_d(char *args) {
-  TODO();
+  char *arg = strtok(NULL, "");
+  int n;
+  int scanf_ret = sscanf(arg, "%d", &n);
+  if (scanf_ret == EOF) {
+    printf("Argument required (watchpoint to delete).\n");
+  }
+  else if (!scanf_ret) {
+    printf("Unknown args '%s'\n", arg);
+  }
+  else if (delete_wp(n) < 0) {
+    printf("Unknown watchpoint '%d'\n", n);
+  }
   return 0;
 }
 
