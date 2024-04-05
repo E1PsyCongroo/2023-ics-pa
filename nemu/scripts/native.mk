@@ -41,10 +41,20 @@ gdb: run-env
 	$(call git_commit, "gdb NEMU")
 	gdb -s $(BINARY) --args $(NEMU_EXEC)
 
+valgrind: run-env
+	valgrind $(NEMU_EXEC)
+
+leak-check: run-env
+	valgrind --leak-check=full $(NEMU_EXEC)
+
 clean-tools = $(dir $(shell find ./tools -maxdepth 2 -mindepth 2 -name "Makefile"))
 $(clean-tools):
 	-@$(MAKE) -s -C $@ clean
 clean-tools: $(clean-tools)
 clean-all: clean distclean clean-tools
 
-.PHONY: run gdb run-env clean-tools clean-all $(clean-tools)
+count:
+	@echo "Counting non-empty lines in .c and .h files..."
+	@find $(NEMU_HOME) \( -name "*.c" -o -name "*.h" \) -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+
+.PHONY: run gdb valgrind leak-check run-env count clean-tools clean-all $(clean-tools)
