@@ -55,6 +55,6 @@ clean-all: clean distclean clean-tools
 
 count:
 	@echo "Counting non-empty lines in .c and .h files..."
-	@find $(NEMU_HOME) -name "*.c" -o -name "*.h" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+	@find $(NEMU_HOME) \( -name "*.c" -o -name "*.h" \) -exec grep -v "^[[:space:]]*$$" {} + | wc -l
 
 .PHONY: run gdb valgrind leak-check run-env count clean-tools clean-all $(clean-tools)
