@@ -25,6 +25,17 @@
 
 static int is_batch_mode = false;
 
+static int cmd_help(char *args);
+static int cmd_c(char *args);
+static int cmd_q(char *args);
+static int cmd_si(char *args);
+static int cmd_info(char *args);
+static int cmd_x(char *args);
+static int cmd_p(char *args);
+static int cmd_w(char *args);
+static int cmd_d(char *args);
+static int cmd_test(char *args);
+
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char* rl_gets() {
   static char *line_read = NULL;
@@ -53,15 +64,6 @@ static int cmd_q(char *args) {
   nemu_state.state =  NEMU_QUIT;
   return -1;
 }
-
-static int cmd_help(char *args);
-static int cmd_si(char *args);
-static int cmd_info(char *args);
-static int cmd_x(char *args);
-static int cmd_p(char *args);
-static int cmd_w(char *args);
-static int cmd_d(char *args);
-static int cmd_test(char *args);
 
 static struct {
   const char *name;
@@ -176,7 +178,7 @@ static int cmd_p(char *args) {
   bool success;
   word_t result = expr(args, &success);
   if (success) {
-    printf("result: %" MUXDEF(CONFIG_ISA64, PRIu64, PRIu32) "\n", result);
+    printf("result: " FMT_WORD "\n", result);
   }
   else {
     printf("Invalid expression\n");
