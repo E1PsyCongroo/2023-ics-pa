@@ -24,6 +24,7 @@
 #define Shift32 4
 #define Shift64 5
 #define Shift MUXDEF(CONFIG_ISA64, Shift64, Shift32)
+#define SEXT32(x) SEXT(x, 32)
 
 enum {
   TYPE_R, TYPE_I, TYPE_S,
