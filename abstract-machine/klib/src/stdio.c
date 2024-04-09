@@ -8,11 +8,7 @@ enum {
   FLAG=0, WIDTH=1, PRECISION=2, LENGTH=3, CONVERSION=4
 };
 enum {
-  SHORTSHORT, SHORT, LONG, LONGLONG, SIZE, LONGDOUBLE, POINTSUB, MAXIMUMINT, DEFAULT
-};
-enum {
-  LITERAL, SINGLECHAR, CHARSTRING, SIGNEDINT, OCTAL, HEXADECIMAL, UNSIGNEDINT,
-  FLAOT, FLOATDECEXP, FLOATHEXEXP, FLAOTPRECISION, NUMWRITTEN, POINTER, NONE
+  SHORTSHORT, SHORT, LONG, LONGLONG, SIZE, LONGDOUBLE, POINTERSUB, MAXIMUMINT, DEFAULT
 };
 
 typedef struct {
@@ -22,20 +18,22 @@ typedef struct {
   unsigned int prefix     : 2;
   unsigned int zero       : 1;
   unsigned int length     : 4;
-  unsigned int conversion : 4;
   unsigned int width;
   unsigned int precision;
+  unsigned int conversion;
 } Format;
 
-static void flag_parser(Format *format, const char* fmt, va_list args);
-static void width_parser(Format *format, const char* fmt, va_list args);
-static void precision_parser(Format *format, const char* fmt, va_list args);
-static void length_parser(Format *format, const char* fmt, va_list args);
-static void conversion_parser(Format *format, const char* fmt, va_list args);
+static int flag_parser(Format *format, const char** fmt, va_list args);
+static int width_parser(Format *format, const char** fmt, va_list args);
+static int precision_parser(Format *format, const char** fmt, va_list args);
+static int length_parser(Format *format, const char** fmt, va_list args);
+static int conversion_parser(Format *format, const char** fmt, va_list args);
+
+static int itos(int num, char* str);
 
 static struct {
   int stage;
-  int (*handle)(Format *format, const char* fmt, va_list args);
+  int (*handle)(Format *format, const char** fmt, va_list args);
 } handle_table[] = {
   { FLAG, flag_parser },
   { WIDTH, width_parser },
@@ -45,7 +43,131 @@ static struct {
 };
 #define TABLELEN (sizeof handle_table / sizeof handle_table[0])
 
-static Format format_parser(const char* fmt, va_list args) {
+static int flag_parser(Format *format, const char** fmt, va_list args) {
+  int doing = 1;
+  while (**fmt && doing) {
+    switch (**fmt) {
+      case '-': format->justify = 1;break;
+      case '+': format->sign = 1;   break;
+      case ' ': format->space = 1;  break;
+      case '#': format->prefix = 1; break;
+      case '0': format->zero = 1;   break;
+      default: doing = 0;           break;
+    }
+    (*fmt)++;
+  }
+  /* handle conflict */
+  if (format->sign) { format->space = 0; }
+  if (format->justify) { format->zero = 0; }
+  return **fmt;
+}
+
+static int width_parser(Format *format, const char** fmt, va_list args) {
+  if (**fmt == '*') {
+    format->width = va_arg(args, int);
+    if (format->width < 0) {
+      format->width = -format->width;
+      format->justify = 1;
+      /* handle conflict */
+      format->zero = 0;
+    }
+    (*fmt)++;
+  }
+  else if (**fmt >= '0' && **fmt <= '9') {
+    while (**fmt >= '0' && **fmt <= '9') {
+      format->width = format->width * 10 + **fmt - '0';
+      (*fmt)++;
+    }
+  }
+  return **fmt;
+}
+
+static int precision_parser(Format *format, const char** fmt, va_list args) {
+  if (**fmt == '.') {
+    (*fmt)++;
+    if (**fmt == '*') {
+      int prec = va_arg(args, int);
+      format->precision = prec > 0 ? prec : format->precision;
+      (*fmt)++;
+    }
+    else if (**fmt >= '0' && **fmt <= '9') {
+      format->precision = 0;
+      while (**fmt >= '0' && **fmt <= '9') {
+        format->precision =  format->precision * 10 + **fmt - '0';
+        (*fmt)++;
+      }
+    }
+    else {
+      format->precision = 0;
+    }
+  }
+  return **fmt;
+}
+
+static int length_parser(Format *format, const char** fmt, va_list args) {
+  switch (**fmt) {
+  case 'h':
+    if (*(*fmt + 1) == 'h') {
+      format->length = SHORTSHORT;
+      (*fmt) += 2;
+    }
+    else {
+      format->length = SHORT;
+      (*fmt)++;
+    }
+    break;
+  case 'l':
+    if (*(*fmt + 1) == 'l') {
+      format->length = LONGLONG;
+      (*fmt) += 2;
+    }
+    else {
+      format->length = LONG;
+      (*fmt)++;
+    }
+    break;
+  case 'j': format->length = MAXIMUMINT; (*fmt)++; break;
+  case 'z': format->length = SIZE;       (*fmt)++; break;
+  case 't': format->length = POINTERSUB; (*fmt)++; break;
+  case 'L': format->length = LONGDOUBLE; (*fmt)++; break;
+  default: break;
+  }
+  return **fmt;
+}
+
+static int conversion_parser(Format *format, const char** fmt, va_list args) {
+  format->conversion = **fmt;
+  switch (**fmt) {
+  case '%':
+  case 'c':
+    panic("Not implemented");
+  case 's': break;
+  case 'd':
+  case 'i':
+    if (format->precision == -1) { format->precision = 1; }
+    break;
+  case '0':
+  case 'x':
+  case 'X':
+  case 'u':
+  case 'f':
+  case 'F':
+  case 'e':
+  case 'E':
+  case 'a':
+  case 'A':
+  case 'g':
+  case 'G':
+  case 'n':
+  case 'p':
+    panic("Not implemented");
+  default: format->conversion = 0; break;
+  }
+  (*fmt)++;
+  return **fmt;
+}
+
+static Format format_parser(const char** fmt, va_list args) {
   Format format = {
     .justify = 0,
     .sign = 0,
@@ -53,18 +175,12 @@ static Format format_parser(const char* fmt, va_list args) {
     .prefix = 0,
     .zero = 0,
     .width = 0,
-    .precision = 1,
+    .precision = -1,  /* -1 means default */
     .length = DEFAULT,
-    .conversion = NONE,
+    .conversion = 0,
   };
-  int stage = FLAG;
-  while (stage) {
-    for (int i = 0; i < TABLELEN; i ++) {
-      if (stage == handle_table[i].stage) {
-        stage = handle_table[i].handle(&format, fmt, args);
-        break;
-      }
-    }
+  for (int stage = 4; stage < TABLELEN; stage++) {
+    if (!handle_table[stage].handle(&format, fmt, args) ) { break; }
   }
   return format;
 }
@@ -74,22 +190,41 @@ int printf(const char *fmt, ...) {
 }
 
 int vsprintf(char *out, const char *fmt, va_list ap) {
-  Format format __attribute_maybe_unused__;
   int count = 0;
   while (*fmt) {
-    if (*fmt != '%') {
-      format = format_parser(fmt, ap);
+    if (*fmt == '%') {
+      fmt++;
+      Format format = format_parser(&fmt, ap);
+      switch (format.conversion) {
+      case 'd': {
+        int num = va_arg(ap, int);
+        int num_width = itos(num, out);
+        out += num_width;
+        count += num_width;
+        break;
+      }
+      case 's': {
+        char* print = va_arg(ap, char*);
+        while (*print) {
+          *(out++) = *(print++);
+          count++;
+        }
+        break;
+      }
+      default:
+        panic("Not implemented");
+      }
     }
     else {
       *(out++) = *(fmt++);
       count++;
     }
   }
+  *out = '\0';
   return count;
 }
 
 int sprintf(char *out, const char *fmt, ...) {
-  panic("Not implemented");
   va_list args;
   va_start(args, fmt);
   int ret = vsprintf(out, fmt, args);
@@ -110,4 +245,35 @@ int vsnprintf(char *out, size_t n, const char *fmt, va_list ap) {
   panic("Not implemented");
 }
 
+static int itos(int num, char* str) {
+  int count = 0;
+  if (str == NULL) {
+      return 0;
+  }
+  if (num == 0) {
+    *str = '0';
+    return 1;
+  }
+
+  int isNegative = 0;
+  if (num < 0) {
+    isNegative = 1;
+    num = -num;
+  }
+  while (num != 0) {
+    int digit = num % 10;
+    str[count++] = '0' + digit;
+    num /= 10;
+  }
+  if (isNegative) {
+    str[count++] = '-';
+  }
+
+  for (int i = 0; i < count / 2; i++) {
+    char temp = str[i];
+    str[i] = str[count - i - 1];
+    str[count - i - 1] = temp;
+  }
+  return count;
+}
 #endif
