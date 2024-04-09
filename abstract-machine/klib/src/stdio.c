@@ -21,19 +21,24 @@ typedef struct {
   unsigned int width;
   unsigned int precision;
   unsigned int conversion;
-} Format;
+} FormatOptions;
 
-static int flag_parser(Format *format, const char** fmt, va_list args);
-static int width_parser(Format *format, const char** fmt, va_list args);
-static int precision_parser(Format *format, const char** fmt, va_list args);
-static int length_parser(Format *format, const char** fmt, va_list args);
-static int conversion_parser(Format *format, const char** fmt, va_list args);
+static int flag_parser(FormatOptions *format, const char** fmt, va_list args);
+static int width_parser(FormatOptions *format, const char** fmt, va_list args);
+static int precision_parser(FormatOptions *format, const char** fmt, va_list args);
+static int length_parser(FormatOptions *format, const char** fmt, va_list args);
+static int conversion_parser(FormatOptions *format, const char** fmt, va_list args);
 
+static int format_char(char *out, FormatOptions format, va_list args);
+static int format_integer(char *out, FormatOptions format, va_list args);
+static int format_float(char *out, FormatOptions format, va_list args);
+static int format_pointer(char *out, FormatOptions format, va_list args);
+/* helper function */
 static int itos(int num, char* str);
 
 static struct {
   int stage;
-  int (*handle)(Format *format, const char** fmt, va_list args);
+  int (*handle)(FormatOptions *format, const char** fmt, va_list args);
 } handle_table[] = {
   { FLAG, flag_parser },
   { WIDTH, width_parser },
@@ -43,7 +48,7 @@ static struct {
 };
 #define TABLELEN (sizeof handle_table / sizeof handle_table[0])
 
-static int flag_parser(Format *format, const char** fmt, va_list args) {
+static int flag_parser(FormatOptions *format, const char** fmt, va_list args) {
   int doing = 1;
   while (**fmt && doing) {
     switch (**fmt) {
@@ -62,7 +67,7 @@ static int flag_parser(Format *format, const char** fmt, va_list args) {
   return **fmt;
 }
 
-static int width_parser(Format *format, const char** fmt, va_list args) {
+static int width_parser(FormatOptions *format, const char** fmt, va_list args) {
   if (**fmt == '*') {
     format->width = va_arg(args, int);
     if (format->width < 0) {
@@ -82,7 +87,7 @@ static int width_parser(Format *format, const char** fmt, va_list args) {
   return **fmt;
 }
 
-static int precision_parser(Format *format, const char** fmt, va_list args) {
+static int precision_parser(FormatOptions *format, const char** fmt, va_list args) {
   if (**fmt == '.') {
     (*fmt)++;
     if (**fmt == '*') {
@@ -104,7 +109,7 @@ static int precision_parser(Format *format, const char** fmt, va_list args) {
   return **fmt;
 }
 
-static int length_parser(Format *format, const char** fmt, va_list args) {
+static int length_parser(FormatOptions *format, const char** fmt, va_list args) {
   switch (**fmt) {
   case 'h':
     if (*(*fmt + 1) == 'h') {
@@ -135,10 +140,10 @@ static int length_parser(Format *format, const char** fmt, va_list args) {
   return **fmt;
 }
 
-static int conversion_parser(Format *format, const char** fmt, va_list args) {
+static int conversion_parser(FormatOptions *format, const char** fmt, va_list args) {
   format->conversion = **fmt;
   switch (**fmt) {
-  case '%':
+  case '%': break;
   case 'c':
     panic("Not implemented");
   case 's': break;
@@ -160,15 +165,14 @@ static int conversion_parser(Format *format, const char** fmt, va_list args) {
   case 'G':
   case 'n':
   case 'p':
-    panic("Not implemented");
-  default: format->conversion = 0; break;
+  default: return **fmt;
   }
   (*fmt)++;
   return **fmt;
 }
 
-static Format format_parser(const char** fmt, va_list args) {
-  Format format = {
+static FormatOptions format_parser(const char** fmt, va_list args) {
+  FormatOptions format = {
     .justify = 0,
     .sign = 0,
     .space = 0,
@@ -185,29 +189,42 @@ static Format format_parser(const char** fmt, va_list args) {
   return format;
 }
 
+static int format_char(char *out, FormatOptions format, va_list args) {
+  panic("Not implemented");
+}
+
+static int format_integer(char *out, FormatOptions format, va_list args) {
+  panic("Not implemented");
+}
+
+static int format_float(char *out, FormatOptions format, va_list args) {
+  panic("Not implemented");
+}
+
+static int format_pointer(char *out, FormatOptions format, va_list args) {
+  panic("Not implemented");
+}
+
 int printf(const char *fmt, ...) {
   panic("Not implemented");
 }
 
 int vsprintf(char *out, const char *fmt, va_list ap) {
-  int count = 0;
   while (*fmt) {
     if (*fmt == '%') {
       fmt++;
-      Format format = format_parser(&fmt, ap);
+      FormatOptions format = format_parser(&fmt, ap);
       switch (format.conversion) {
       case 'd': {
         int num = va_arg(ap, int);
         int num_width = itos(num, out);
         out += num_width;
-        count += num_width;
         break;
       }
       case 's': {
         char* print = va_arg(ap, char*);
         while (*print) {
           *(out++) = *(print++);
-          count++;
         }
         break;
       }
@@ -217,11 +234,10 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
     }
     else {
       *(out++) = *(fmt++);
-      count++;
     }
   }
   *out = '\0';
-  return count;
+  return strlen(out);
 }
 
 int sprintf(char *out, const char *fmt, ...) {
