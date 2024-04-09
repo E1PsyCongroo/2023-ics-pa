@@ -32,9 +32,9 @@ static int conversion_parser(FormatOptions *format, const char **fmt, va_list *a
 
 static int format_char(char *out, FormatOptions *format, va_list *args);
 static int format_integer(char *out, FormatOptions *format, va_list *args);
-__attribute_maybe_unused__ static int format_float(char *out, FormatOptions *format, va_list *args);
-__attribute_maybe_unused__ static int format_pointer(char *out, FormatOptions *format, va_list *args);
-__attribute_maybe_unused__ static int format_others(char *out, FormatOptions *format, va_list *args);
+static int format_float(char *out, FormatOptions *format, va_list *args);
+static int format_pointer(char *out, FormatOptions *format, va_list *args);
+static int format_others(char *out, FormatOptions *format, va_list *args);
 /* helper function */
 static int itos(int num, char *str);
 
@@ -206,7 +206,7 @@ static int format_char(char *out, FormatOptions *format, va_list *args) {
   int count = 0;
   switch (format->conversion) {
   case 'c': {
-    char ch = va_arg(*args, int);
+    unsigned char ch = va_arg(*args, int);
     *out = ch;
     count = 1;
     break;
@@ -256,14 +256,30 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
       else {
         int width;
         switch (format.conversion) {
-        case 'd':
+        case '%':
+          *out = '%';
+          width = 1;
+          break;
+        case 'd': case 'i': case 'o': case 'u':
+        case 'x': case 'X':
           width = format_integer(out, &format, &ap);
           break;
-        case 's':
+        case 'c': case 's':
           width = format_char(out, &format, &ap);
           break;
+        case 'f': case 'F': case 'e': case 'E':
+        case 'a': case 'A': case 'g': case 'G':
+          width = format_float(out, &format, &ap);
+          break;
+        case 'p':
+          width = format_pointer(out, &format, &ap);
+          break;
+        case 'n':
+          width = itos(count, out);
+          break;
         default:
-          panic("Not implemented");
+          width = format_others(out, &format, &ap);
+          break;
         }
         out += width;
         count += width;
