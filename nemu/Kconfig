@@ -162,6 +162,16 @@ config IRINGBUF_SIZE
   range 2 100
   default 20
 
+config MTRACE
+  depends on TRACE && TARGET_NATIVE_ELF && ENGINE_INTERPRETER
+  bool "Enable memory tracer"
+  default y
+
+config MTRACE_COND
+  depends on MTRACE
+  string "Only trace memory when the condition is true"
+  default "true"
+
 config DIFFTEST
   depends on TARGET_NATIVE_ELF
   bool "Enable differential testing"
