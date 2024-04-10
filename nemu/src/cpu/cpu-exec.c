@@ -108,14 +108,14 @@ static void statistic() {
 
 static void print_i_ring_buf() {
   for (int i = 0; i < i_ring_buf.capacity; i++) {
-    printf(i_ring_buf.ptr == i ? "\t%s\n" : "-->\t%s\n", i_ring_buf.buf[i]);
+    printf("%6s%s\n", i_ring_buf.ptr - 1 == i ? "  --> " : "", i_ring_buf.buf[i]);
   }
 }
 
 void assert_fail_msg() {
   isa_reg_display();
   statistic();
-  print_i_ring_buf();
+  IFDEF(CONFIG_IRINGBUF, print_i_ring_buf());
 }
 
 /* Simulate how the CPU works. */
@@ -144,6 +144,7 @@ void cpu_exec(uint64_t n) {
            (nemu_state.halt_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) :
             ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
           nemu_state.halt_pc);
+      IFDEF(CONFIG_IRINGBUF, print_i_ring_buf());
       // fall through
     case NEMU_QUIT: statistic();
   }
