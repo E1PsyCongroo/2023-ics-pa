@@ -21,7 +21,7 @@ void init_log(const char *log_file);
 void init_mem();
 void init_difftest(char *ref_so_file, long img_size, int port);
 void init_device();
-void init_sdb();
+void init_sdb(const char* elf_file);
 void init_disasm(const char *triple);
 
 static void welcome() {
@@ -40,7 +40,6 @@ static void welcome() {
 #include <getopt.h>
 
 void sdb_set_batch_mode();
-void init_ftrace(const char* elf_file);
 
 static char *log_file = NULL;
 static char *diff_so_file = NULL;
@@ -130,10 +129,7 @@ void init_monitor(int argc, char *argv[]) {
   init_difftest(diff_so_file, img_size, difftest_port);
 
   /* Initialize the simple debugger. */
-  init_sdb();
-
-  /* Initialize the ftrace */
-  init_ftrace(elf_file);
+  init_sdb(elf_file);
 
 #ifndef CONFIG_ISA_loongarch32r
   IFDEF(CONFIG_ITRACE, init_disasm(

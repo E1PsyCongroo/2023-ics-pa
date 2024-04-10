@@ -282,10 +282,11 @@ void sdb_mainloop() {
   }
 }
 
-void init_sdb() {
+void init_sdb(const char* elf_file) {
   /* Compile the regular expressions. */
   init_regex();
 
   /* Initialize the watchpoint pool. */
   init_wp_pool();
+  IFDEF(CONFIG_FTRACE, init_ftrace(elf_file));
 }
