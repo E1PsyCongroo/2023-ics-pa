@@ -9,6 +9,7 @@ typedef struct {
 } FtraceTable;
 
 static FtraceTable *ftrace_table = NULL;
+static size_t ftrace_table_num = 0;
 static char *elf_str = NULL;
 
 #define N MUXDEF(CONFIG_ISA64, 64, 32)
@@ -47,7 +48,6 @@ void init_ftrace(const char* elf_file) {
   fseek(fp, str_offset, SEEK_SET);
   fread(elf_str, str_size, 1, fp);
   /* generating ftrace table*/
-  size_t ftrace_table_num = 0;
   for (size_t i = 0; i < elf_symentnum; i++) {
     if (concat3(ELF,N,_ST_TYPE)(elf_sym[i].st_info) == STT_FUNC) {
       ftrace_table_num++;
@@ -65,3 +65,25 @@ void init_ftrace(const char* elf_file) {
     }
   }
 }
+
+void ftrace(uint32_t instruction, word_t pc, word_t dnpc) {
+  static char* current_fun = NULL;
+  static int num_space = 0;
+  if (ftrace_table == NULL) { return; }
+  for (size_t i = 0; i < ftrace_table_num; i++) {
+    if (dnpc >= ftrace_table[i].faddr && dnpc < ftrace_table[i].faddr + ftrace_table[i].fsize
+        && ftrace_table[i].fname != current_fun) {
+      if (BITS(instruction, 6, 0) == 0b1100111 && BITS(instruction, 19, 15) == 1) {
+        /* jalr ret type */
+        num_space = num_space == 0 ? 0 : num_space - 1;
+        log_write(ANSI_FMT(FMT_WORD ": %*sret[%s->%s]\n", ANSI_FG_YELLOW), pc, num_space, "", current_fun, ftrace_table[i].fname);
+      } else {
+        /* jal call type */
+        log_write(ANSI_FMT(FMT_WORD ": %*scall[%s@" FMT_WORD "]\n", ANSI_FG_YELLOW), pc, num_space, "", ftrace_table[i].fname, dnpc);
+        num_space += 1;
+      }
+      current_fun = ftrace_table[i].fname;
+    }
+  }
+}
+

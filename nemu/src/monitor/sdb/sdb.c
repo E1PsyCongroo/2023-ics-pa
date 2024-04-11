@@ -288,5 +288,8 @@ void init_sdb(const char* elf_file) {
 
   /* Initialize the watchpoint pool. */
   init_wp_pool();
-  IFDEF(CONFIG_FTRACE, init_ftrace(elf_file));
+#ifdef CONFIG_FTRACE
+  void init_ftrace(const char* elf_file);
+  init_ftrace(elf_file);
+#endif
 }

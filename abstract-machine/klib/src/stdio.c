@@ -247,11 +247,13 @@ int printf(const char *fmt, ...) {
 
 int vsprintf(char *out, const char *fmt, va_list ap) {
   int count = 0;
+  va_list args;
+  va_copy(args, ap);
   while (*fmt) {
     if (*fmt == '%') {
       fmt++;
       bool success;
-      FormatOptions format = format_parser(&fmt, &success, &ap);
+      FormatOptions format = format_parser(&fmt, &success, &args);
       if (!success) { return -1; }
       else {
         int width;
@@ -262,23 +264,23 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
           break;
         case 'd': case 'i': case 'o': case 'u':
         case 'x': case 'X':
-          width = format_integer(out, &format, &ap);
+          width = format_integer(out, &format, &args);
           break;
         case 'c': case 's':
-          width = format_char(out, &format, &ap);
+          width = format_char(out, &format, &args);
           break;
         case 'f': case 'F': case 'e': case 'E':
         case 'a': case 'A': case 'g': case 'G':
-          width = format_float(out, &format, &ap);
+          width = format_float(out, &format, &args);
           break;
         case 'p':
-          width = format_pointer(out, &format, &ap);
+          width = format_pointer(out, &format, &args);
           break;
         case 'n':
           width = itos(count, out);
           break;
         default:
-          width = format_others(out, &format, &ap);
+          width = format_others(out, &format, &args);
           break;
         }
         out += width;
@@ -291,6 +293,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
     }
   }
   *out = '\0';
+  va_end(args);
   return count;
 }
 

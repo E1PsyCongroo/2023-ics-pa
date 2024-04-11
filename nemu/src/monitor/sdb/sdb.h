@@ -21,7 +21,6 @@
 word_t expr(char *e, bool *success);
 void init_regex();
 void init_wp_pool();
-void init_ftrace(const char* elf_file);
 int delete_wp(int number);
 void wp_display();
 bool add_wp(char *e);
