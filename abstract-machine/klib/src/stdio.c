@@ -247,7 +247,7 @@ static int format_float(char *out, FormatOptions *format, va_list *args) {
 
 static int format_pointer(char *out, FormatOptions *format, va_list *args) {
   void *ptr = va_arg(*args, void*);
-  return utohs((uint64_t)ptr, out);
+  return utohs((size_t)ptr, out);
 }
 
 int printf(const char *fmt, ...) {
