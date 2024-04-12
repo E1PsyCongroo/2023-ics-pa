@@ -70,14 +70,14 @@ void *memset(void *s, int c, size_t n) {
 
 void *memmove(void *dst, const void *src, size_t n) {
   if ((size_t)src > (size_t)dst && (size_t)dst + n > (size_t)src) {
+    memcpy(dst, src, n);
+  }
+  else {
     unsigned char *dst_p = dst;
     const unsigned char *src_p = src ;
     while (n--) {
       dst_p[n] = src_p[n];
     }
-  }
-  else {
-    memcpy(dst, src, n);
   }
   return dst;
 }

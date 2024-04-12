@@ -19,9 +19,9 @@ typedef struct {
   unsigned int prefix : 2;
   unsigned int zero : 1;
   unsigned int length : 4;
-  unsigned int width;
-  unsigned int precision;
-  unsigned int conversion;
+  int width;
+  int precision;
+  int conversion;
 } FormatOptions;
 
 static int flag_parser(FormatOptions *format, const char **fmt, va_list *args);
@@ -34,9 +34,10 @@ static int format_char(char *out, FormatOptions *format, va_list *args);
 static int format_integer(char *out, FormatOptions *format, va_list *args);
 static int format_float(char *out, FormatOptions *format, va_list *args);
 static int format_pointer(char *out, FormatOptions *format, va_list *args);
-static int format_others(char *out, FormatOptions *format, va_list *args);
 /* helper function */
+static void reverse(char *str, int l, int j);
 static int itos(int num, char *str);
+static int utohs(uint64_t num, char *str);
 
 static struct {
   int stage;
@@ -204,11 +205,22 @@ static FormatOptions format_parser(const char **fmt, bool *success, va_list *arg
 
 static int format_char(char *out, FormatOptions *format, va_list *args) {
   int count = 0;
+  if (format->zero || format->prefix) { return -1; }
   switch (format->conversion) {
   case 'c': {
     unsigned char ch = va_arg(*args, int);
-    *out = ch;
-    count = 1;
+    if (format->justify) {
+      out[count++] = ch;
+      for (int i = 0; i < format->width - 1; i++) {
+        out[count++] = ' ';
+      }
+    }
+    else {
+      for (int i = 0; i < format->width - 1; i++) {
+        out[count++] = ' ';
+      }
+      out[count++] = ch;
+    }
     break;
   }
   case 's': {
@@ -234,11 +246,8 @@ static int format_float(char *out, FormatOptions *format, va_list *args) {
 }
 
 static int format_pointer(char *out, FormatOptions *format, va_list *args) {
-  panic("Not implemented");
-}
-
-static int format_others(char *out, FormatOptions *format, va_list *args) {
-  panic("Not implemented");
+  void *ptr = va_arg(*args, void*);
+  return utohs((uint64_t)ptr, out);
 }
 
 int printf(const char *fmt, ...) {
@@ -280,9 +289,9 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
           width = itos(count, out);
           break;
         default:
-          width = format_others(out, &format, &args);
-          break;
+          return -count;
         }
+        if (width < 0) { return -count; }
         out += width;
         count += width;
       }
@@ -318,6 +327,14 @@ int vsnprintf(char *out, size_t n, const char *fmt, va_list ap) {
   panic("Not implemented");
 }
 
+static void reverse_str(char *str, int l, int j) {
+  while (l < j) {
+    char temp = str[l];
+    str[l] = str[j];
+    str[j] = temp;
+    l++; j--;
+  }
+}
 static int itos(int num, char *str) {
   int count = 0;
   if (str == NULL) {
@@ -341,12 +358,29 @@ static int itos(int num, char *str) {
   if (isNegative) {
     str[count++] = '-';
   }
+  reverse(str, 0, count-1);
+  return count;
+}
 
-  for (int i = 0; i < count / 2; i++) {
-    char temp = str[i];
-    str[i] = str[count - i - 1];
-    str[count - i - 1] = temp;
+static int utohs(uint64_t num, char *str) {
+  int count = 2;
+  str[0] = '0'; str[1] = 'x';
+
+  if (num == 0) {
+      str[count++] = '0';
+      return count;
   }
+
+  while (num != 0) {
+      int temp = num % 16;
+      if (temp < 10) {
+          str[count++] = temp + '0';
+      } else {
+          str[count++] = (temp - 10) + 'A';  // 使用 'A' 到 'F'
+      }
+      num = num / 16;
+  }
+  reverse(str, 0, count-1);
   return count;
 }
 #endif
