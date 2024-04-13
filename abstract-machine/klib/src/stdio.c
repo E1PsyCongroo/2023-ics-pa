@@ -2,6 +2,7 @@
 #include <klib.h>
 #include <klib-macros.h>
 #include <stdarg.h>
+#include <sys/types.h>
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 enum {
@@ -24,6 +25,17 @@ typedef struct {
   int conversion;
 } FormatOptions;
 
+/* helper function */
+static void reverse(char *str, int l, int j);
+static int itos(int64_t num, char *str);
+static int utos(uint64_t num, char *str);
+static int utohs(uint64_t num, char *str);
+static int utoos(uint64_t num, char *str);
+static void insert_ch(char *str, int length, int count, char fillch);
+static int keep_precision(char *str, int length, FormatOptions *format);
+static int keep_width(char *str, int length, FormatOptions *format, char fillch);
+
+/* parser funciton*/
 static int flag_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int width_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int precision_parser(FormatOptions *format, const char **fmt, va_list *args);
@@ -108,6 +120,8 @@ static int precision_parser(FormatOptions *format, const char **fmt, va_list *ar
     else {
       format->precision = 0;
     }
+    /* handle conflict */
+    format->zero = 0;
   }
   return **fmt;
 }
@@ -231,14 +245,99 @@ static int format_char(char *out, FormatOptions *format, va_list *args) {
     }
     break;
   }
-  default: panic("Not implemented");
+  default: return -1;
   }
+  count += keep_width(out, count, format, ' ');
   return count;
 }
 
 static int format_integer(char *out, FormatOptions *format, va_list *args) {
-  int num = va_arg(*args, int);
-  return itos(num, out);
+  int count = 0;
+  switch (format->conversion) {
+  case 'd': case 'i': {
+    if (format->prefix) { return -1; }
+    int64_t num = 0;
+    switch (format->length) {
+    case SHORTSHORT: num= va_arg(*args, signed char); break;
+    case SHORT: num = va_arg(*args, short);           break;
+    case DEFAULT: num = va_arg(*args, int);           break;
+    case LONG: num = va_arg(*args, long);             break;
+    case LONGLONG: num = va_arg(*args, long long);    break;
+    case MAXIMUMINT: num = va_arg(*args, intmax_t);   break;
+    case SIZE: num = va_arg(*args, ssize_t);          break;
+    case POINTERSUB: num = va_arg(*args, ptrdiff_t);  break;
+    default: return -1;
+    }
+    if (format->precision == 0 && num == 0) { return 0; }
+    if (num > 0) {
+      if (format->sign) {
+        format->width--;
+      }
+      else if (format->space) {
+        format->width--;
+      }
+    }
+    count += itos(num, out);
+    count += keep_precision(out, count, format);
+    count += keep_width(out, count, format, format->zero ? '0' : ' ');
+    if (num > 0) {
+      if (format->sign) {
+        insert_ch(out, count++, 1, '+');
+      }
+      else if (format->space) {
+        insert_ch(out, count++, 1, ' ');
+      }
+    }
+  }
+  case 'o': case 'x': case 'X': case 'u': {
+    uint64_t num = 0;
+    switch (format->length) {
+    case SHORTSHORT: num= va_arg(*args, unsigned char);     break;
+    case SHORT: num = va_arg(*args, unsigned short);        break;
+    case DEFAULT: num = va_arg(*args, unsigned int);        break;
+    case LONG: num = va_arg(*args, unsigned long);          break;
+    case LONGLONG: num = va_arg(*args, unsigned long long); break;
+    case MAXIMUMINT: num = va_arg(*args, uintmax_t);        break;
+    case SIZE: num = va_arg(*args, size_t);                 break;
+    case POINTERSUB: num = va_arg(*args, size_t);           break;
+    default: return -1;
+    }
+    if (format->precision == 0 && num == 0) { return 0; }
+    switch (format->conversion) {
+    case 'u': {
+      if (format->prefix) { return -1; }
+      count += utos(num, out);
+      count += keep_precision(out, count, format);
+      count += keep_width(out, count, format, format->zero ? '0' : ' ');
+    }
+    case 'o': {
+      if (format->prefix) {
+        format->width--;
+      }
+      count += utoos(num, out);
+      count += keep_precision(out, count, format);
+      count += keep_width(out, count, format, format->zero ? '0' : ' ');
+      if (format->prefix) {
+        insert_ch(out, count++, 1, '0');
+      }
+    }
+    case 'x': case 'X': {
+      if (format->prefix) {
+        format->width -= 2;
+      }
+      count += utohs(num, out);
+      count += keep_precision(out, count, format);
+      count += keep_width(out, count, format, format->zero ? '0' : ' ');
+      if (format->prefix) {
+        insert_ch(out, count++, 1, '0');
+        insert_ch(out, count++, 1, format->prefix == 2 ? 'x' : 'X');
+      }
+    }
+    }
+  }
+  default: return -1;
+  }
+  return 0;
 }
 
 static int format_float(char *out, FormatOptions *format, va_list *args) {
@@ -335,7 +434,7 @@ static void reverse_str(char *str, int l, int j) {
     l++; j--;
   }
 }
-static int itos(int num, char *str) {
+static int itos(int64_t num, char *str) {
   int count = 0;
   if (str == NULL) {
     return 0;
@@ -362,25 +461,85 @@ static int itos(int num, char *str) {
   return count;
 }
 
-static int utohs(uint64_t num, char *str) {
-  int count = 2;
-  str[0] = '0'; str[1] = 'x';
-
+static int utos(uint64_t num, char *str) {
+  int count = 0;
   if (num == 0) {
-      str[count++] = '0';
-      return count;
+    str[count++] = '0';
+    return count;
   }
 
   while (num != 0) {
-      int temp = num % 16;
-      if (temp < 10) {
-          str[count++] = temp + '0';
-      } else {
-          str[count++] = (temp - 10) + 'A';  // 使用 'A' 到 'F'
-      }
-      num = num / 16;
+    int temp = num % 10;
+    str[count++] = temp + '0';
+    num = num / 10;
   }
   reverse(str, 0, count-1);
+  return count;
+}
+
+static int utoos(uint64_t num, char *str) {
+  int count = 0;
+  if (num == 0) {
+    str[count++] = '0';
+    return count;
+  }
+
+  while (num != 0) {
+    int temp = num % 8;
+    str[count++] = temp + '0';
+    num = num / 8;
+  }
+  reverse(str, 0, count-1);
+  return count;
+}
+
+static int utohs(uint64_t num, char *str) {
+  int count = 0;
+  if (num == 0) {
+    str[count++] = '0';
+    return count;
+  }
+
+  while (num != 0) {
+    int temp = num % 16;
+    if (temp < 10) {
+      str[count++] = temp + '0';
+    } else {
+      str[count++] = (temp - 10) + 'A';
+    }
+    num = num / 16;
+  }
+  reverse(str, 0, count-1);
+  return count;
+}
+
+static void insert_ch(char *str, int length, int count, char fillch) {
+  for (int i = 0; i < length; i++) {
+    str[count + i - 1] = str[i];
+  }
+  for (int i = 0; i < count; i++) {
+    str[i] = fillch;
+  }
+}
+
+static int keep_width(char *str, int length, FormatOptions *format, char fillch) {
+  int count = format->width - length;
+  if (count < 0) { return 0; }
+  if (format->justify) {
+    for (int i = 0; i < count; i++) {
+      str[length + i - 1] = fillch;
+    }
+  }
+  else {
+    insert_ch(str, length, count, fillch);
+  }
+  return count;
+}
+
+static int keep_precision(char *str, int length, FormatOptions *format) {
+  int count = format->precision - length;
+  if (count < 0) { return 0; }
+  insert_ch(str, length, count, '0');
   return count;
 }
 #endif
