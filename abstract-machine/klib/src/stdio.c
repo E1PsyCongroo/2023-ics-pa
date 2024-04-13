@@ -258,14 +258,14 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
     if (format->prefix) { return -1; }
     int64_t num = 0;
     switch (format->length) {
-    case SHORTSHORT: num= va_arg(*args, signed char); break;
-    case SHORT: num = va_arg(*args, short);           break;
-    case DEFAULT: num = va_arg(*args, int);           break;
-    case LONG: num = va_arg(*args, long);             break;
-    case LONGLONG: num = va_arg(*args, long long);    break;
-    case MAXIMUMINT: num = va_arg(*args, intmax_t);   break;
-    case SIZE: num = va_arg(*args, ssize_t);          break;
-    case POINTERSUB: num = va_arg(*args, ptrdiff_t);  break;
+    case SHORTSHORT: num= (signed char)va_arg(*args, int);  break;
+    case SHORT: num = (short)va_arg(*args, int);            break;
+    case DEFAULT: num = va_arg(*args, int);                 break;
+    case LONG: num = va_arg(*args, long);                   break;
+    case LONGLONG: num = va_arg(*args, long long);          break;
+    case MAXIMUMINT: num = va_arg(*args, intmax_t);         break;
+    case SIZE: num = va_arg(*args, ssize_t);                break;
+    case POINTERSUB: num = va_arg(*args, ptrdiff_t);        break;
     default: return -1;
     }
     if (format->precision == 0 && num == 0) { return 0; }
@@ -288,18 +288,19 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
         insert_ch(out, count++, 1, ' ');
       }
     }
+    break;
   }
   case 'o': case 'x': case 'X': case 'u': {
     uint64_t num = 0;
     switch (format->length) {
-    case SHORTSHORT: num= va_arg(*args, unsigned char);     break;
-    case SHORT: num = va_arg(*args, unsigned short);        break;
-    case DEFAULT: num = va_arg(*args, unsigned int);        break;
-    case LONG: num = va_arg(*args, unsigned long);          break;
-    case LONGLONG: num = va_arg(*args, unsigned long long); break;
-    case MAXIMUMINT: num = va_arg(*args, uintmax_t);        break;
-    case SIZE: num = va_arg(*args, size_t);                 break;
-    case POINTERSUB: num = va_arg(*args, size_t);           break;
+    case SHORTSHORT: num= (unsigned char)va_arg(*args, int);  break;
+    case SHORT: num = (unsigned short)va_arg(*args, int);     break;
+    case DEFAULT: num = va_arg(*args, unsigned int);          break;
+    case LONG: num = va_arg(*args, unsigned long);            break;
+    case LONGLONG: num = va_arg(*args, unsigned long long);   break;
+    case MAXIMUMINT: num = va_arg(*args, uintmax_t);          break;
+    case SIZE: num = va_arg(*args, size_t);                   break;
+    case POINTERSUB: num = va_arg(*args, size_t);             break;
     default: return -1;
     }
     if (format->precision == 0 && num == 0) { return 0; }
@@ -309,6 +310,7 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
       count += utos(num, out);
       count += keep_precision(out, count, format);
       count += keep_width(out, count, format, format->zero ? '0' : ' ');
+      break;
     }
     case 'o': {
       if (format->prefix) {
@@ -320,6 +322,7 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
       if (format->prefix) {
         insert_ch(out, count++, 1, '0');
       }
+      break;
     }
     case 'x': case 'X': {
       if (format->prefix) {
@@ -332,12 +335,14 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
         insert_ch(out, count++, 1, '0');
         insert_ch(out, count++, 1, format->prefix == 2 ? 'x' : 'X');
       }
+      break;
     }
     }
+    break;
   }
   default: return -1;
   }
-  return 0;
+  return count;
 }
 
 static int format_float(char *out, FormatOptions *format, va_list *args) {
@@ -515,7 +520,7 @@ static int utohs(uint64_t num, char *str) {
 
 static void insert_ch(char *str, int length, int count, char fillch) {
   for (int i = 0; i < length; i++) {
-    str[count + i - 1] = str[i];
+    str[count + i] = str[i];
   }
   for (int i = 0; i < count; i++) {
     str[i] = fillch;
@@ -524,7 +529,7 @@ static void insert_ch(char *str, int length, int count, char fillch) {
 
 static int keep_width(char *str, int length, FormatOptions *format, char fillch) {
   int count = format->width - length;
-  if (count < 0) { return 0; }
+  if (count <= 0) { return 0; }
   if (format->justify) {
     for (int i = 0; i < count; i++) {
       str[length + i - 1] = fillch;
@@ -538,7 +543,7 @@ static int keep_width(char *str, int length, FormatOptions *format, char fillch)
 
 static int keep_precision(char *str, int length, FormatOptions *format) {
   int count = format->precision - length;
-  if (count < 0) { return 0; }
+  if (count <= 0) { return 0; }
   insert_ch(str, length, count, '0');
   return count;
 }
