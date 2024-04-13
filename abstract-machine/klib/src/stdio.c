@@ -198,7 +198,7 @@ static int conversion_parser(FormatOptions *format, const char **fmt, va_list *a
   return 1;
 }
 
-static FormatOptions format_parser(const char **fmt, bool *success, va_list *args) {
+static FormatOptions format_parser(const char **fmt, int *success, va_list *args) {
   FormatOptions format = {
       .justify = 0,
       .sign = 0,
@@ -365,7 +365,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
   while (*fmt) {
     if (*fmt == '%') {
       fmt++;
-      bool success;
+      int success;
       FormatOptions format = format_parser(&fmt, &success, &args);
       if (!success) { return -1; }
       else {
