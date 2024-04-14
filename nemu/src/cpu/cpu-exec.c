@@ -35,6 +35,12 @@ struct {
   int ptr;
   int capacity;
 } i_ring_buf = {};
+
+static void print_i_ring_buf() {
+  for (int i = 0; i < i_ring_buf.capacity; i++) {
+    printf("%6s%s\n", i_ring_buf.ptr - 1 == i ? "  --> " : "", i_ring_buf.buf[i]);
+  }
+}
 #endif
 
 void device_update();
@@ -104,12 +110,6 @@ static void statistic() {
   Log("total guest instructions = " NUMBERIC_FMT, g_nr_guest_inst);
   if (g_timer > 0) Log("simulation frequency = " NUMBERIC_FMT " inst/s", g_nr_guest_inst * 1000000 / g_timer);
   else Log("Finish running in less than 1 us and can not calculate the simulation frequency");
-}
-
-static void print_i_ring_buf() {
-  for (int i = 0; i < i_ring_buf.capacity; i++) {
-    printf("%6s%s\n", i_ring_buf.ptr - 1 == i ? "  --> " : "", i_ring_buf.buf[i]);
-  }
 }
 
 void assert_fail_msg() {

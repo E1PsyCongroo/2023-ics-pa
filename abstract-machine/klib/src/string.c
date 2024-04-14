@@ -51,8 +51,9 @@ int strcmp(const char *s1, const char *s2) {
 
 int strncmp(const char *s1, const char *s2, size_t n) {
   int ret = 0;
-  while (*s1 && *s2 && n--) {
+  while (*s1 && *s2 && n) {
     if ((ret = *(s1++) - *(s2++))) { return ret; }
+    n--;
   }
   if (!n) { }
   else if (*s1) { ret = *s1; }
