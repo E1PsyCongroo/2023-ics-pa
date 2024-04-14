@@ -6,9 +6,9 @@
 !/nanos-lite/*
 !/navy-apps/*
 !/docs/*
+!/am-kernels/*
 !Makefile
 !README.md
 !.gitignore
 !init.sh
 /fceux-am
-/am-kernels
