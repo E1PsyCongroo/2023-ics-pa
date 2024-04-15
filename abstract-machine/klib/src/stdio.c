@@ -35,21 +35,18 @@ static void insert_ch(char *str, int length, int count, char fillch);
 static int keep_precision(char *str, int length, FormatOptions *format);
 static int keep_width(char *str, int length, FormatOptions *format, char fillch);
 
-/* parser funciton*/
+/* parser funciton */
 static int flag_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int width_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int precision_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int length_parser(FormatOptions *format, const char **fmt, va_list *args);
 static int conversion_parser(FormatOptions *format, const char **fmt, va_list *args);
 
+/* format funciton */
 static int format_char(char *out, FormatOptions *format, va_list *args);
 static int format_integer(char *out, FormatOptions *format, va_list *args);
 static int format_float(char *out, FormatOptions *format, va_list *args);
 static int format_pointer(char *out, FormatOptions *format, va_list *args);
-/* helper function */
-static void reverse(char *str, int l, int j);
-static int itos(int num, char *str);
-static int utohs(uint64_t num, char *str);
 
 static struct {
   int stage;
@@ -355,7 +352,13 @@ static int format_pointer(char *out, FormatOptions *format, va_list *args) {
 }
 
 int printf(const char *fmt, ...) {
-  panic("Not implemented");
+  char buf[4096];
+  va_list args;
+  va_start(args, fmt);
+  int ret = vsprintf(buf, fmt, args);
+  va_end(args);
+  putstr(buf);
+  return ret;
 }
 
 int vsprintf(char *out, const char *fmt, va_list ap) {
@@ -431,7 +434,7 @@ int vsnprintf(char *out, size_t n, const char *fmt, va_list ap) {
   panic("Not implemented");
 }
 
-static void reverse_str(char *str, int l, int j) {
+static void reverse(char *str, int l, int j) {
   while (l < j) {
     char temp = str[l];
     str[l] = str[j];
