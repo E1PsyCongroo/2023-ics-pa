@@ -522,7 +522,7 @@ static int utohs(uint64_t num, char *str) {
 }
 
 static void insert_ch(char *str, int length, int count, char fillch) {
-  for (int i = 0; i < length; i++) {
+  for (int i = length - 1; i >= 0; i--) {
     str[count + i] = str[i];
   }
   for (int i = 0; i < count; i++) {
@@ -535,7 +535,7 @@ static int keep_width(char *str, int length, FormatOptions *format, char fillch)
   if (count <= 0) { return 0; }
   if (format->justify) {
     for (int i = 0; i < count; i++) {
-      str[length + i - 1] = fillch;
+      str[length + i] = fillch;
     }
   }
   else {

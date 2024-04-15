@@ -30,9 +30,8 @@ int main() {
 
       reset();
       memmove(data, data + l, r - l);
-      check_seq(0, l, l + 1);
-      check_seq(l, r, l + 1);
-      check_seq(r, N, r + 1);
+      check_seq(0, r - l, l + 1);
+      check_seq(r - l, N, r - l + 1);
     }
   }
 }
