@@ -46,7 +46,7 @@ enum {
   | (BITS(i, 20, 20) << 11) | (BITS(i, 30, 21) << 1); \
 } while(0)
 #define SRA(src1, src2) ( \
-  ((src1) < 0) ? ({ word_t mask = ~((1 << (sizeof(word_t)*8-(src2))) - 1); ((src1) >> (src2) | mask); }) \
+  ((src1) < 0 && src2 != 0) ? ({ word_t mask = ~((1 << (sizeof(word_t)*8-(src2))) - 1); ((src1) >> (src2) | mask); }) \
   : ((src1) >> (src2)) \
 )
 
