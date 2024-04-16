@@ -555,7 +555,7 @@ static int num_writer(CWriter writer, const char *num, int num_len, FormatOption
   }
 
   if (format->zero) {
-    if (num_len + precision_len + sign_len < format->width) {
+    if (num_len + precision_len + sign_len + prefix_len < format->width) {
       precision_len = format->width - num_len - sign_len - prefix_len;
     }
   }
