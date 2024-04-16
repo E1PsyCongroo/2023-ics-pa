@@ -359,11 +359,11 @@ static int vprintf(CWriter writer, const char *fmt, va_list *args) {
       }
     }
     else {
-      write_ch(*(fmt)++);
+      writer(*(fmt)++);
       count++;
     }
   }
-  write_ch('\0');
+  writer('\0');
   return count;
 }
 
@@ -498,26 +498,26 @@ static int utohs(uint64_t num, char *str, int upper_case) {
   if (write_len > format->width) {
     count += write_len;
     while (write_len--) {
-      write_ch(*(str++));
+      writer(*(str++));
     }
   }
   else {
     if (format->justify) {
       count += write_len;
       while (write_len--) {
-        write_ch(*(str++));
+        writer(*(str++));
       }
       for (; count < format->width; count++) {
-        write_ch(fillch);
+        writer(fillch);
       }
     }
     else {
       for (; count < format->width - write_len; count++) {
-        write_ch(fillch);
+        writer(fillch);
       }
       count += write_len;
       while(*str) {
-        write_ch(*(str++));
+        writer(*(str++));
       }
     }
   }
