@@ -25,15 +25,20 @@ typedef struct {
   int conversion;
 } FormatOptions;
 
+typedef void (*CWriter)(char);
+static char **dest = NULL;
+static char buffer[128];
+
 /* helper function */
+static void set_dest(char **out);
+static void write_ch(char ch);
 static void reverse(char *str, int l, int j);
 static int itos(int64_t num, char *str);
 static int utos(uint64_t num, char *str);
 static int utohs(uint64_t num, char *str);
 static int utoos(uint64_t num, char *str);
-static void insert_ch(char *str, int length, int count, char fillch);
-static int keep_precision(char *str, int length, FormatOptions *format);
-static int keep_width(char *str, int length, FormatOptions *format, char fillch);
+static int keep_width_writer(CWriter writer, char *str, int write_len, FormatOptions *format, char fillch);
+static int num_writer(CWriter writer, const char *num, int num_len, FormatOptions *format);
 
 /* parser funciton */
 static int flag_parser(FormatOptions *format, const char **fmt, va_list *args);
@@ -43,10 +48,10 @@ static int length_parser(FormatOptions *format, const char **fmt, va_list *args)
 static int conversion_parser(FormatOptions *format, const char **fmt, va_list *args);
 
 /* format funciton */
-static int format_char(char *out, FormatOptions *format, va_list *args);
-static int format_integer(char *out, FormatOptions *format, va_list *args);
-static int format_float(char *out, FormatOptions *format, va_list *args);
-static int format_pointer(char *out, FormatOptions *format, va_list *args);
+static int format_char(CWriter writer, FormatOptions *format, va_list *args);
+static int format_integer(CWriter writer, FormatOptions *format, va_list *args);
+static int format_float(CWriter writer, FormatOptions *format, va_list *args);
+static int format_pointer(CWriter writer, FormatOptions *format, va_list *args);
 
 static struct {
   int stage;
@@ -104,7 +109,7 @@ static int precision_parser(FormatOptions *format, const char **fmt, va_list *ar
     (*fmt)++;
     if (**fmt == '*') {
       int prec = va_arg(*args, int);
-      format->precision = prec > 0 ? prec : format->precision;
+      format->precision = (prec > 0) ? prec : format->precision;
       (*fmt)++;
     }
     else if (**fmt >= '0' && **fmt <= '9') {
@@ -214,45 +219,37 @@ static FormatOptions format_parser(const char **fmt, int *success, va_list *args
   return format;
 }
 
-static int format_char(char *out, FormatOptions *format, va_list *args) {
+static int format_char(CWriter writer, FormatOptions *format, va_list *args) {
   int count = 0;
   if (format->zero || format->prefix) { return -1; }
   switch (format->conversion) {
   case 'c': {
     unsigned char ch = va_arg(*args, int);
-    if (format->justify) {
-      out[count++] = ch;
-      for (int i = 0; i < format->width - 1; i++) {
-        out[count++] = ' ';
-      }
-    }
-    else {
-      for (int i = 0; i < format->width - 1; i++) {
-        out[count++] = ' ';
-      }
-      out[count++] = ch;
-    }
+    buffer[0] = ch;
+    count += keep_width_writer(writer, buffer, 1, format, ' ');
     break;
   }
   case 's': {
     char *str = va_arg(*args, char *);
-    while (*str) {
-      *(out++) = *(str++);
-      count++;
+    size_t length = strlen(str);
+    if (format->precision < 0) {
+      count += keep_width_writer(writer, str, length, format, ' ');
+    }
+    else {
+      int write_len = (length > format->precision) ? format->precision : length;
+      count += keep_width_writer(writer, str, write_len, format, ' ');
     }
     break;
   }
   default: return -1;
   }
-  count += keep_width(out, count, format, ' ');
   return count;
 }
 
-static int format_integer(char *out, FormatOptions *format, va_list *args) {
-  int count = 0;
+static int format_integer(CWriter writer, FormatOptions *format, va_list *args) {
+  int num_len = 0;
   switch (format->conversion) {
   case 'd': case 'i': {
-    if (format->prefix) { return -1; }
     int64_t num = 0;
     switch (format->length) {
     case SHORTSHORT: num= (signed char)va_arg(*args, int);  break;
@@ -265,26 +262,9 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
     case POINTERSUB: num = va_arg(*args, ptrdiff_t);        break;
     default: return -1;
     }
+    if (format->prefix) { return -1; }
     if (format->precision == 0 && num == 0) { return 0; }
-    if (num > 0) {
-      if (format->sign) {
-        format->width--;
-      }
-      else if (format->space) {
-        format->width--;
-      }
-    }
-    count += itos(num, out);
-    count += keep_precision(out, count, format);
-    count += keep_width(out, count, format, format->zero ? '0' : ' ');
-    if (num > 0) {
-      if (format->sign) {
-        insert_ch(out, count++, 1, '+');
-      }
-      else if (format->space) {
-        insert_ch(out, count++, 1, ' ');
-      }
-    }
+    num_len = itos(num, buffer);
     break;
   }
   case 'o': case 'x': case 'X': case 'u': {
@@ -300,115 +280,104 @@ static int format_integer(char *out, FormatOptions *format, va_list *args) {
     case POINTERSUB: num = va_arg(*args, size_t);             break;
     default: return -1;
     }
-    if (format->precision == 0 && num == 0) { return 0; }
     switch (format->conversion) {
-    case 'u': {
+    case 'u':
       if (format->prefix) { return -1; }
-      count += utos(num, out);
-      count += keep_precision(out, count, format);
-      count += keep_width(out, count, format, format->zero ? '0' : ' ');
+      if (format->precision == 0 && num == 0) { return 0; }
+      num_len = utos(num, buffer);
       break;
-    }
-    case 'o': {
-      if (format->prefix) {
-        format->width--;
-      }
-      count += utoos(num, out);
-      count += keep_precision(out, count, format);
-      count += keep_width(out, count, format, format->zero ? '0' : ' ');
-      if (format->prefix) {
-        insert_ch(out, count++, 1, '0');
-      }
+    case 'o':
+      num_len = utoos(num, buffer);
+      if (format->precision == 0 && num == 0) { return 0; }
       break;
-    }
-    case 'x': case 'X': {
-      if (format->prefix) {
-        format->width -= 2;
-      }
-      count += utohs(num, out);
-      count += keep_precision(out, count, format);
-      count += keep_width(out, count, format, format->zero ? '0' : ' ');
-      if (format->prefix) {
-        insert_ch(out, count++, 1, '0');
-        insert_ch(out, count++, 1, format->prefix == 2 ? 'x' : 'X');
-      }
+    case 'x': case 'X':
+      num_len = utohs(num, buffer);
+      if (format->precision == 0 && num == 0) { return 0; }
       break;
-    }
     }
     break;
   }
   default: return -1;
   }
-  return count;
+  return num_writer(writer, buffer, num_len, format);
 }
 
-static int format_float(char *out, FormatOptions *format, va_list *args) {
+static int format_float(CWriter writer, FormatOptions *format, va_list *args) {
   panic("Not implemented");
 }
 
-static int format_pointer(char *out, FormatOptions *format, va_list *args) {
+static int format_pointer(CWriter writer, FormatOptions *format, va_list *args) {
   void *ptr = va_arg(*args, void*);
-  return utohs((size_t)ptr, out);
+  int count = utohs((size_t)ptr, buffer) + 2;
+  writer('0');
+  writer('x');
+  for (int i = 0; i < count; i++) {
+    writer(buffer[i]);
+  }
+  return count;
 }
 
-int printf(const char *fmt, ...) {
-  char buf[4096];
-  va_list args;
-  va_start(args, fmt);
-  int ret = vsprintf(buf, fmt, args);
-  va_end(args);
-  putstr(buf);
-  return ret;
-}
-
-int vsprintf(char *out, const char *fmt, va_list ap) {
+static int vprintf(CWriter writer, const char *fmt, va_list *args) {
   int count = 0;
-  va_list args;
-  va_copy(args, ap);
   while (*fmt) {
     if (*fmt == '%') {
       fmt++;
       int success;
-      FormatOptions format = format_parser(&fmt, &success, &args);
+      FormatOptions format = format_parser(&fmt, &success, args);
       if (!success) { return -1; }
       else {
         int width;
         switch (format.conversion) {
         case '%':
-          *out = '%';
+          writer('%');
           width = 1;
           break;
         case 'd': case 'i': case 'o': case 'u':
         case 'x': case 'X':
-          width = format_integer(out, &format, &args);
+          width = format_integer(writer, &format, args);
           break;
         case 'c': case 's':
-          width = format_char(out, &format, &args);
+          width = format_char(writer, &format, args);
           break;
         case 'f': case 'F': case 'e': case 'E':
         case 'a': case 'A': case 'g': case 'G':
-          width = format_float(out, &format, &args);
+          width = format_float(writer, &format, args);
           break;
         case 'p':
-          width = format_pointer(out, &format, &args);
+          width = format_pointer(writer, &format, args);
           break;
         case 'n':
-          width = itos(count, out);
+          panic("TODO");
           break;
         default:
           return -count;
         }
         if (width < 0) { return -count; }
-        out += width;
         count += width;
       }
     }
     else {
-      *(out++) = *(fmt++);
+      write_ch(*(fmt)++);
       count++;
     }
   }
-  *out = '\0';
+  write_ch('\0');
+  return count;
+}
+
+int printf(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  int count = vprintf(putch, fmt, &args);
+  va_end(args);
+  return count;
+}
+
+int vsprintf(char *out, const char *fmt, va_list ap) {
+  va_list args;
+  va_copy(args, ap);
+  set_dest(&out);
+  int count = vprintf(write_ch, fmt, &args);
   va_end(args);
   return count;
 }
@@ -423,15 +392,19 @@ int sprintf(char *out, const char *fmt, ...) {
 
 int snprintf(char *out, size_t n, const char *fmt, ...) {
   panic("Not implemented");
-  va_list args;
-  va_start(args, fmt);
-  int ret = vsnprintf(out, n, fmt, args);
-  va_end(args);
-  return ret;
 }
 
 int vsnprintf(char *out, size_t n, const char *fmt, va_list ap) {
   panic("Not implemented");
+}
+
+/* helper funciont */
+static void set_dest(char **out) {
+  dest = out;
+}
+
+static void write_ch(char ch) {
+  if (dest) { *((*dest)++) = ch; }
 }
 
 static void reverse(char *str, int l, int j) {
@@ -444,9 +417,6 @@ static void reverse(char *str, int l, int j) {
 }
 static int itos(int64_t num, char *str) {
   int count = 0;
-  if (str == NULL) {
-    return 0;
-  }
   if (num == 0) {
     *str = '0';
     return 1;
@@ -521,33 +491,99 @@ static int utohs(uint64_t num, char *str) {
   return count;
 }
 
-static void insert_ch(char *str, int length, int count, char fillch) {
-  for (int i = length - 1; i >= 0; i--) {
-    str[count + i] = str[i];
-  }
-  for (int i = 0; i < count; i++) {
-    str[i] = fillch;
-  }
-}
-
-static int keep_width(char *str, int length, FormatOptions *format, char fillch) {
-  int count = format->width - length;
-  if (count <= 0) { return 0; }
-  if (format->justify) {
-    for (int i = 0; i < count; i++) {
-      str[length + i] = fillch;
+ static int keep_width_writer(CWriter writer, char *str, int write_len, FormatOptions *format, char fillch) {
+  int count = 0;
+  if (write_len > format->width) {
+    count += write_len;
+    while (write_len--) {
+      write_ch(*(str++));
     }
   }
   else {
-    insert_ch(str, length, count, fillch);
+    if (format->justify) {
+      count += write_len;
+      while (write_len--) {
+        write_ch(*(str++));
+      }
+      for (; count < format->width; count++) {
+        write_ch(fillch);
+      }
+    }
+    else {
+      for (; count < format->width - write_len; count++) {
+        write_ch(fillch);
+      }
+      count += write_len;
+      while(*str) {
+        write_ch(*(str++));
+      }
+    }
   }
   return count;
 }
 
-static int keep_precision(char *str, int length, FormatOptions *format) {
-  int count = format->precision - length;
-  if (count <= 0) { return 0; }
-  insert_ch(str, length, count, '0');
-  return count;
+static int num_writer(CWriter writer, const char *num, int num_len, FormatOptions *format) {
+  char sign = format->sign ? '+' : ' ';
+  int sign_len = (num > 0 && (format->space || format->sign)) ? 1 : 0;
+  if (*num == '-') {
+    sign = '-';
+    sign_len = 1;
+    num++;
+    num_len -= 1;
+  }
+
+  const char *prefix = NULL;
+  int prefix_len = 0;
+  switch (format->prefix) {
+  case 1:
+    prefix = "0";
+    prefix_len = 1;
+    break;
+  case 2:
+    prefix = "0x";
+    prefix_len = 2;
+    break;
+  case 3:
+    prefix = "0X";
+    prefix_len = 2;
+    break;
+  default: break;
+  }
+
+  int precision_len = (format->precision > num_len) ? format->precision - num_len : 0;
+  int space_len = 0;
+  if (format->zero) {
+    if (num_len + precision_len + sign_len < format->width) {
+      precision_len = format->width - num_len - sign_len;
+    }
+  }
+  else {
+    if (num_len + precision_len + sign_len < format->width) {
+      space_len = format->width - num_len - precision_len - sign_len;
+    }
+  }
+  /* fill space according to format->justify */
+  if (!format->justify) {
+    for (int i = 0; i < space_len; i++) { writer(' '); }
+  }
+  /* write sign */
+  if (sign_len) { writer(sign); }
+  /* write prefix */
+  for (int i = 0; i < prefix_len; i++) {
+    writer(prefix[i]);
+  }
+  /* write precision-zero */
+  for (int i = 0; i < precision_len; i++) {
+    writer('0');
+  }
+  /* write num */
+  for (int i = 0; i < num_len; i++) {
+    writer(num[i]);
+  }
+  /* fill space according to format->justify */
+  if (format->justify) {
+    for (int i = 0; i < space_len; i++) { writer(' '); }
+  }
+  return sign_len + prefix_len + precision_len + num_len + space_len;
 }
 #endif
