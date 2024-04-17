@@ -22,6 +22,6 @@ submit:
 
 count:
 	@echo "Counting non-empty lines in .c and .h files..."
-	@find . \( -name "*.c" -o -name "*.h" \) -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+	@find $(NEMU_HOME) $(AM_HOME) \( -name "*.c" -o -name "*.h" \) -exec grep -v "^[[:space:]]*$$" {} + | wc -l
 
 .PHONY: default submit count
