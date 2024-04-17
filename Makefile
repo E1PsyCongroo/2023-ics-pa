@@ -20,4 +20,8 @@ submit:
 	git gc
 	STUID=$(STUID) STUNAME=$(STUNAME) bash -c "$$(curl -s http://why.ink:8080/static/submit.sh)"
 
-.PHONY: default submit
+count:
+	@echo "Counting non-empty lines in .c and .h files..."
+	@find . \( -name "*.c" -o -name "*.h" \) -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+
+.PHONY: default submit count
