@@ -17,7 +17,7 @@ SRCS-y += src/nemu-main.c
 DIRS-y += src/cpu src/monitor src/utils
 DIRS-$(CONFIG_MODE_SYSTEM) += src/memory
 DIRS-BLACKLIST-$(CONFIG_TARGET_AM) += src/monitor/sdb
-ifndef CONFIG_FTRACE
+ifneq ($(CONFIG_FTRACE),y)
 	SRCS-BLACKLIST-y += src/monitor/sdb/ftrace.c
 endif
 
