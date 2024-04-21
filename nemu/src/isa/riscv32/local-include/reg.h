@@ -30,4 +30,9 @@ static inline const char* reg_name(int idx) {
   return regs[check_reg_idx(idx)];
 }
 
+enum {
+  MEPC = 0x341      , MSTATUS = 0x300,
+  MCAUSE = 0x342    , MTVEC = 0x305,
+};
+
 #endif

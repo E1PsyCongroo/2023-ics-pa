@@ -22,6 +22,8 @@
 #define R(i) gpr(i)
 #define Mr vaddr_read
 #define Mw vaddr_write
+#define Csr csr_to_reg
+#define ECALL isa_raise_intr
 #define Shift32 4
 #define Shift64 5
 #define Shift MUXDEF(CONFIG_ISA64, Shift64, Shift32)
@@ -30,7 +32,7 @@
 enum {
   TYPE_R, TYPE_I, TYPE_S,
   TYPE_B, TYPE_U, TYPE_J,
-  TYPE_N, // none
+  TYPE_N, TYPE_C// none
 };
 #if INT128
 typedef struct {
@@ -67,6 +69,7 @@ static uint128_t multiply_uint64_to_uint128(uint64_t a, uint64_t b) {
 
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
+#define uimm() do { *src1 = rs1; } while (0)
 #define immI() do { *imm = SEXT(BITS(i, 31, 20), 12); } while(0)
 #define immU() do { *imm = SEXT(BITS(i, 31, 12), 20) << 12; } while(0)
 #define immS() do { *imm = (SEXT(BITS(i, 31, 25), 7) << 5) | BITS(i, 11, 7); } while(0)
@@ -95,6 +98,16 @@ static uint128_t multiply_uint64_to_uint128(uint64_t a, uint64_t b) {
   ((src2) != 0) ? ((src1) % (src2)) : (src1) \
 )
 
+static word_t *csr_to_reg(int csr) {
+  switch (csr) {
+  case MEPC:    return &cpu.mepc;
+  case MSTATUS: return &cpu.mstatus;
+  case MCAUSE:  return &cpu.mcause;
+  case MTVEC:   return &cpu.mtvec;
+  default: panic("%x csr don't implement", csr);
+  }
+  return NULL;
+}
 
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst.val;
@@ -104,6 +117,7 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
   switch (type) {
     case TYPE_R: src1R(); src2R();         break;
     case TYPE_I: src1R();          immI(); break;
+    case TYPE_C: uimm() ;          immI(); break;
     case TYPE_S: src1R(); src2R(); immS(); break;
     case TYPE_B: src1R(); src2R(); immB(); break;
     case TYPE_U:                   immU(); break;
@@ -163,8 +177,8 @@ static int decode_exec(Decode *s) {
   INSTPAT("0100000 ????? ????? 101 ????? 01100 11", sra    , R, R(rd) = SRA((sword_t)src1, BITS(src2, Shift, 0)));
   INSTPAT("0000000 ????? ????? 110 ????? 01100 11", or     , R, R(rd) = src1 | src2);
   INSTPAT("0000000 ????? ????? 111 ????? 01100 11", and    , R, R(rd) = src1 & src2);
-  // INSTPAT("??????? ????? ????? 000 ????? 00011 11", fence);
-  // INSTPAT("0000000 00001 00000 000 00000 11100 11", ecall);
+  // INSTPAT("??????? ????? ????? 000 ????? 00011 11", fence  , I, );
+  INSTPAT("0000000 00001 00000 000 00000 11100 11", ecall  , I, s->dnpc = ECALL(MUXDEF(CONFIG_RVE, R(15), R(17)), s->snpc));
   INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak , R, NEMUTRAP(s->pc, R(10))); // R(10) is $a0
   #ifdef CONFIG_ISA64
   /* RV64I */
@@ -215,6 +229,15 @@ static int decode_exec(Decode *s) {
   INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem    , R, R(rd) = REM((sword_t)src1, (sword_t)src2));
   INSTPAT("0000001 ????? ????? 111 ????? 01100 11", remu   , R, R(rd) = REMU(src1, src2));
   #endif
+  /* Zicsr */
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, if (rd != 0) { R(rd) = *Csr(imm); }; *Csr(imm) = src1);
+  INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , I, R(rd) = *Csr(imm); *Csr(imm) |= src1);
+  INSTPAT("??????? ????? ????? 011 ????? 11100 11", csrrc  , I, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
+  INSTPAT("??????? ????? ????? 101 ????? 11100 11", csrrwi , C, if (rd != 0) { R(rd) = *Csr(imm); }; *Csr(imm) = src1);
+  INSTPAT("??????? ????? ????? 110 ????? 11100 11", csrrsi , C, R(rd) = *Csr(imm); *Csr(imm) |= src1);
+  INSTPAT("??????? ????? ????? 111 ????? 11100 11", csrrci , C, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
+  /* Machine-Mode Privileged Instructions */
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, s->dnpc = cpu.mepc);
 
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));
   INSTPAT_END();
