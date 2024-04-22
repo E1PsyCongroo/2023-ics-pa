@@ -133,6 +133,7 @@ static int decode_exec(Decode *s) {
 
   IFDEF(CONFIG_DIFFTEST, void difftest_skip_ref());
   IFDEF(CONFIG_FTRACE, void ftrace(int type, word_t pc, word_t dnpc));
+  IFDEF(CONFIG_ETRACE, void etrace(int type, word_t pc, word_t info));
 #define INSTPAT_INST(s) ((s)->isa.inst.val)
 #define INSTPAT_MATCH(s, name, type, ... /* execute body */ ) { \
   decode_operand(s, &rd, &src1, &src2, &imm, concat(TYPE_, type)); \
@@ -179,7 +180,7 @@ static int decode_exec(Decode *s) {
   INSTPAT("0000000 ????? ????? 110 ????? 01100 11", or     , R, R(rd) = src1 | src2);
   INSTPAT("0000000 ????? ????? 111 ????? 01100 11", and    , R, R(rd) = src1 & src2);
   // INSTPAT("??????? ????? ????? 000 ????? 00011 11", fence  , I, );
-  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, s->dnpc = ECALL(MUXDEF(CONFIG_RVE, R(15), R(17)), s->pc));
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, s->dnpc = ECALL(MUXDEF(CONFIG_RVE, R(15), R(17)), s->pc); IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, MUXDEF(CONFIG_RVE, R(15), R(17)))));
   INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak , R, NEMUTRAP(s->pc, R(10))); // R(10) is $a0
   #ifdef CONFIG_ISA64
   /* RV64I */
@@ -238,7 +239,7 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? 110 ????? 11100 11", csrrsi , C, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); R(rd) = *Csr(imm); *Csr(imm) |= src1);
   INSTPAT("??????? ????? ????? 111 ????? 11100 11", csrrci , C, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
   /* Machine-Mode Privileged Instructions */
-  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); s->dnpc = cpu.mepc);
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); s->dnpc = cpu.mepc; IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, s->dnpc)));
 
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));
   INSTPAT_END();
