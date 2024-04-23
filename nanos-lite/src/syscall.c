@@ -1,7 +1,9 @@
 #include <common.h>
-// #include <sys/types.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <fs.h>
 #include "syscall.h"
-#define STRACE_EN 1
+#define STRACE_EN 0
 #if STRACE_EN
 #define syscall_log(format, ...) printf("\33[1;37m" format "\33[0m", ## __VA_ARGS__)
 static void strace(Context *c) {
@@ -11,29 +13,33 @@ static void strace(Context *c) {
   a[2] = c->GPR3;
   a[3] = c->GPR4;
   switch (a[0]) {
-    case SYS_exit: syscall_log("%s(%d)", "exit", a[1]); break;
-    case SYS_yield: syscall_log("%s()", "yield"); break;
-    case SYS_write: syscall_log("%s(%d, %p, %zu)", "write", a[1], (void*)a[2], a[3]); break;
-    case SYS_brk: syscall_log("%s(%p)", "brk", (void*)a[1]); break;
-    default: panic("Unhandled syscall ID = %d", a[0]);
+    case SYS_exit:          syscall_log("%s(%d)", "exit", a[1]);                                              break;
+    case SYS_yield:         syscall_log("%s()", "yield");                                                     break;
+    case SYS_open:          syscall_log("%s(%s, %d, %d)", "open", (char*)a[1], a[2], a[3]);                   break;
+    case SYS_read:          syscall_log("%s(%s, %p, %zu)", "read", fd_to_filename(a[1]), (void*)a[2], a[3]);  break;
+    case SYS_write:         syscall_log("%s(%s, %p, %zu)", "write", fd_to_filename(a[1]), (void*)a[2], a[3]); break;
+    case SYS_close:         syscall_log("%s(%d)", "close", a[1]);                                             break;
+    case SYS_lseek:         syscall_log("%s(%s, %zd, %d)", "lseek", fd_to_filename(a[1]), a[2], a[3]);        break;
+    case SYS_brk:           syscall_log("%s(%p)", "brk", (void*)a[1]);                                        break;
+    case SYS_gettimeofday:  syscall_log("%s(%p, %p)", "gettimeofday", (void*)a[1], (void*)a[2]);              break;
+    default: panic("Strace: unhandled syscall ID = %d", a[0]);
   }
 }
 #endif
-static int _yield() {
+int sys_yield() {
   yield();
   return 0;
 }
-static void _exit(int status) {
+void sys_exit(int status) {
   halt(status);
 }
-static int _write(int fd, void* buf, size_t count) {
-  if (fd == 1 || fd == 2) {
-    for (size_t i = 0; i < count; i++) { putch(((char*)buf)[i]); }
-    return count;
-  }
-  return -1;
+int sys_brk(void *addr) {
+  return 0;
 }
-static int _brk(void *addr) {
+int sys_gettimeofday(struct timeval *tv, struct timezone *tz) {
+  uint64_t us = io_read(AM_TIMER_UPTIME).us;
+  tv->tv_sec = us / 1000000;
+  tv->tv_usec = us % 1000000;
   return 0;
 }
 void do_syscall(Context *c) {
@@ -51,10 +57,15 @@ void do_syscall(Context *c) {
     #if STRACE_EN
       syscall_log(" = ?\n");
     #endif
-      _exit(a[1]); break;
-    case SYS_yield: c->GPRx = _yield(); break;
-    case SYS_write: c->GPRx = _write(a[1], (void*)a[2], a[3]); break;
-    case SYS_brk: c->GPRx = _brk((void*)a[1]); break;
+      sys_exit(a[1]); break;
+    case SYS_yield:         c->GPRx = sys_yield();                                break;
+    case SYS_open:          c->GPRx = fs_open((char*)a[1], a[2], a[3]);           break;
+    case SYS_read:          c->GPRx = fs_read(a[1], (void*)a[2], a[3]);           break;
+    case SYS_write:         c->GPRx = fs_write(a[1], (void*)a[2], a[3]);          break;
+    case SYS_close:         c->GPRx = fs_close(a[1]);                             break;
+    case SYS_lseek:         c->GPRx = fs_lseek(a[1], a[2], a[3]);                 break;
+    case SYS_brk:           c->GPRx = sys_brk((void*)a[1]);                       break;
+    case SYS_gettimeofday:  c->GPRx = sys_gettimeofday((void*)a[1], (void*)a[2]); break;
     default: panic("Unhandled syscall ID = %d", a[0]);
   }
   #if STRACE_EN

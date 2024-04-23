@@ -310,13 +310,13 @@ static int format_float(CWriter writer, FormatOptions *format, va_list *args) {
 
 static int format_pointer(CWriter writer, FormatOptions *format, va_list *args) {
   void *ptr = va_arg(*args, void*);
-  int count = utohs((size_t)ptr, buffer, 0) + 2;
+  int count = utohs((size_t)ptr, buffer, 0);
   writer('0');
   writer('x');
   for (int i = 0; i < count; i++) {
     writer(buffer[i]);
   }
-  return count;
+  return count+2;
 }
 
 static int vprintf(CWriter writer, const char *fmt, va_list *args) {

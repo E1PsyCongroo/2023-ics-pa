@@ -29,6 +29,11 @@ count:
 	@find $(NEMU_HOME) -name "*.c" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
 	@echo -n ".h: "
 	@find $(NEMU_HOME) -name "*.h" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+	@echo "Nanos"
+	@echo -n ".c: "
+	@find $(NEMU_HOME)/../nanos-lite -name "*.c" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
+	@echo -n ".h: "
+	@find $(NEMU_HOME)/../nanos-lite -name "*.h" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
 	@echo "AM:"
 	@echo -n ".c: "
 	@find $(AM_HOME) -name "*.c" -exec grep -v "^[[:space:]]*$$" {} + | wc -l
