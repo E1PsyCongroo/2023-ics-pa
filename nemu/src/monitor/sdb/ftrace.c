@@ -20,7 +20,7 @@ void init_ftrace(const char* elf_file) {
   /* read ELF header */
   concat3(Elf,N,_Ehdr) elf_ehdr;
   Assert(fread(&elf_ehdr, sizeof elf_ehdr, 1, fp) != sizeof elf_ehdr, "%s is not a elf file\n", elf_file);
-  Assert(!strncmp((char*)elf_ehdr.e_ident, "\x7f""ELF", 4), "%s is not a elf file\n", elf_file);
+  Assert(*(uint32_t*)elf_ehdr.e_ident == 0x464c457f, "%s is not a elf file\n", elf_file);
   /* read Section header */
   fseek(fp, elf_ehdr.e_shoff, SEEK_SET);
   concat3(Elf,N,_Shdr) elf_shdr[elf_ehdr.e_shnum];
