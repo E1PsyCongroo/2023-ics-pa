@@ -11,7 +11,7 @@
 #endif
 
 #if defined(__ISA_AM_NATIVE__)
-#define EXPECT_TYPE EM_IA_64
+#define EXPECT_TYPE EM_X86_64
 #elif defined(__ISA_X86__)
 #define EXPECT_TYPE EM_IA_64
 #elif defined(__ISA_MIPS32__)

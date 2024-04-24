@@ -3,29 +3,121 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 void SDL_BlitSurface(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rect *dstrect) {
   assert(dst && src);
   assert(dst->format->BitsPerPixel == src->format->BitsPerPixel);
+  uint8_t BytesPerPixel = src->format->BytesPerPixel;
+  uint8_t *pixels_src = src->pixels;
+  uint8_t *pixels_dst = dst->pixels;
+  int w = src->w, h = src->h;
+  if (srcrect) {
+    w = srcrect->w;
+    h = srcrect->h;
+  }
+  int base_dst = 0, base_src = 0;
+  if (dstrect) {
+    base_dst = ((dstrect->y * dst->w) + dstrect->x) * BytesPerPixel;
+  }
+  for (int i = 0; i < h; i++) {
+    for (int j = 0; j < w * BytesPerPixel; j+=BytesPerPixel) {
+      memcpy(pixels_dst+base_dst+j, pixels_src+base_src+j, BytesPerPixel);
+    }
+    base_dst += dst->w * BytesPerPixel;
+    base_src += src->w * BytesPerPixel;
+  }
 }
 
 void SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, uint32_t color) {
-  uint32_t *pixels_ptr = dst->pixels;
-  int base = (dstrect->y * dst->w) + dstrect->x;
-  for (int i = 0; i < dstrect->h; i++) {
-    for (int j = 0; j < dstrect->w; j++) {
-      pixels_ptr[base + j] = color;
+  uint8_t BitsPerPixel = dst->format->BitsPerPixel;
+  if (BitsPerPixel == 8) {
+    uint8_t *pixels_ptr = dst->pixels;
+    SDL_Palette *palette = dst->format->palette;
+    int base = 0;
+    if (dstrect) {
+      base = (dstrect->y * dst->w) + dstrect->x;
     }
-    base += dst->w;
+    SDL_Color sdl_color = {
+      .a = (color >> 24) & 0xff,
+      .r = (color >> 16) & 0xff,
+      .g = (color >> 8) & 0xff,
+      .b = color & 0xff,
+    };
+    int color_index = 0;
+    for (; color_index < palette->ncolors; color_index++) {
+      if (sdl_color.val == palette->colors[color_index].val) { break; }
+    }
+    if (color_index == palette->ncolors) {
+      palette->ncolors++;
+      palette->colors = realloc(palette->colors, (palette->ncolors) * (sizeof (*palette->colors)));
+      palette->colors[palette->ncolors-1] = sdl_color;
+    }
+    for (int i = 0; i < dst->h; i++) {
+      for (int j = 0; j < dst->w; j++) {
+        pixels_ptr[base + j] = color_index;
+      }
+      base += dst->w;
+    }
+  }
+  else if (BitsPerPixel == 32) {
+    uint32_t *pixels_ptr = dst->pixels;
+    int base = 0;
+    if (dstrect) {
+      base = (dstrect->y * dst->w) + dstrect->x;
+    }
+    for (int i = 0; i < dst->h; i++) {
+      for (int j = 0; j < dst->w; j++) {
+        pixels_ptr[base + j] = color;
+      }
+      base += dst->w;
+    }
+  }
+  else {
+    assert(0);
   }
 }
 
 void SDL_UpdateRect(SDL_Surface *s, int x, int y, int w, int h) {
-  if (x == 0 && y == 0 && w == 0 && h == 0) {
-    NDL_DrawRect((void*)s->pixels, 0, 0, s->w, s->h);
+  int BitsPerPixel = s->format->BitsPerPixel;
+  if (BitsPerPixel == 8) {
+    SDL_Palette *palette = s->format->palette;
+    if (x == 0 && y == 0 && w == 0 && h == 0) {
+      w = s->w;
+      h = s->h;
+    }
+    uint32_t *pixels = malloc(w * h * sizeof(uint32_t));
+    int base = x + y * s->w;
+    for (int i = 0; i < h; i++) {
+      for (int j = 0; j < w; j++) {
+        int palette_index = s->pixels[base+j];
+        assert(palette_index < palette->ncolors);
+        SDL_Color *color = &palette->colors[palette_index];
+        uint8_t a = color->a, r = color->r, g = color->g, b = color->b;
+        pixels[base+j] = (a << 24) | (r << 16) | (g << 8) | b;
+      }
+      base += s->w;
+    }
+    NDL_DrawRect(pixels, x, y, w, h);
+    free(pixels);
+  }
+  else if (BitsPerPixel ==32){
+    if ((x == 0 && y == 0 && w == 0 && h == 0) || (w == s->w)) {
+      NDL_DrawRect((void*)s->pixels, x, y, s->w, s->h);
+    }
+    else {
+      uint32_t *pixels = malloc(w * h * sizeof(uint32_t));
+      int base = 0;
+      for (int i = 0; i < h; i++) {
+        memcpy(pixels + base, s->pixels + base, w * sizeof(uint32_t));
+        base += s->w;
+      }
+      NDL_DrawRect(pixels, x, y, w, h);
+      free(pixels);
+    }
   }
   else {
-    NDL_DrawRect((void*)(s->pixels+s->format->BytesPerPixel*(x+(y*s->w))), x, y, w, h);
+    assert(0);
   }
 }
 

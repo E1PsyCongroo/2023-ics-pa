@@ -61,10 +61,12 @@ void NDL_DrawRect(uint32_t *pixels, int x, int y, int w, int h) {
   uint32_t *pixels_ptr = pixels;
   const int w_padding = (system_w - screen_w) / 2;
   const int h_padding = (system_h - screen_h) / 2;
+  int base = x + w_padding + (y + h_padding) * system_w;
   for (int i = 0; i < h; i++) {
-    _lseek(fbdev, x+w_padding+(y+h_padding+i)*system_w, SEEK_SET);
-    _write(fbdev, pixels_ptr, w);
+    _lseek(fbdev, base * 4, SEEK_SET);
+    _write(fbdev, pixels_ptr, w * 4);
     pixels_ptr += w;
+    base += system_w;
   }
 }
 
