@@ -3,5 +3,7 @@
 
 #define ARCH_H "navy.h"
 #include "am-origin.h"
+#include "amdev.h"
+#include "klib-macros.h"
 
 #endif

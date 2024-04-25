@@ -11,6 +11,8 @@ size_t serial_write(const void *buf, size_t offset, size_t len);
 size_t events_read(void *buf, size_t offset, size_t len);
 size_t dispinfo_read(void *buf, size_t offset, size_t len);
 size_t fb_write(const void *buf, size_t offset, size_t len);
+size_t fs_ioe_read(void *buf, size_t offset, size_t len) { ioe_read(offset, buf); return len; }
+size_t fs_ioe_write(const void *buf, size_t offset, size_t len) { ioe_write(offset, (void*)buf); return len;}
 typedef struct {
   char *name;
   size_t size;
@@ -19,7 +21,7 @@ typedef struct {
   WriteFn write;
 } Finfo;
 
-enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_EVENTS, FD_DISINFO, FD_FB};
+enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_EVENTS, FD_DISINFO, FD_FB, FB_IOREAD, FB_IOWRITE};
 
 size_t invalid_read(void *buf, size_t offset, size_t len) {
   panic("should not reach here");
@@ -37,8 +39,10 @@ static Finfo file_table[] __attribute__((used)) = {
   [FD_STDOUT] = {"stdout", 0, 0, invalid_read, serial_write},
   [FD_STDERR] = {"stderr", 0, 0, invalid_read, serial_write},
   [FD_EVENTS] = {"/dev/events", 0, 0, events_read, invalid_write},
-  [FD_DISINFO] = {"/proc/disinfo", 0, 0, dispinfo_read, invalid_write},
+  [FD_DISINFO] = {"/proc/dispinfo", 0, 0, dispinfo_read, invalid_write},
   [FD_FB] = {"/dev/fb", 0, 0, invalid_read, fb_write},
+  [FB_IOREAD] = {"/dev/ioeread", 0, 0, fs_ioe_read, invalid_write},
+  [FB_IOWRITE] = {"/dev/ioewrite", 0, 0, invalid_read, fs_ioe_write},
 #include "files.h"
 };
 #define FILENUM (LENGTH(file_table) - 1)

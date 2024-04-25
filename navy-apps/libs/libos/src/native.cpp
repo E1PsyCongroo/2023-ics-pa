@@ -233,7 +233,9 @@ ssize_t write(int fd, const void *buf, size_t count) {
     SDL_PauseAudio(0);
     return count;
   }
-  return glibc_write(fd, buf, count);
+  ssize_t ret = glibc_write(fd, buf, count);
+  update_screen();
+  return ret;
 }
 
 int execve(const char *filename, char *const argv[], char *const envp[]) {

@@ -1,3 +1,6 @@
+AS        = gcc-12
+CC        = gcc-12
+CXX       = g++-12
 LD = $(CXX)
 
 ### Run an application with $(ISA)=native

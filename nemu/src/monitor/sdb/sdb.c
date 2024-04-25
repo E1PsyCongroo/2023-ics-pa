@@ -24,7 +24,7 @@
 #include "utils.h"
 
 static int is_batch_mode = false;
-static int difftest_en = true;
+IFDEF(CONFIG_DIFFTEST , static int difftest_en = false);
 
 static int cmd_help(char *args);
 static int cmd_c(char *args);
@@ -220,16 +220,20 @@ static int cmd_d(char *args) {
 }
 
 static int cmd_detach(char *args) {
+#ifdef CONFIG_DIFFTEST
   difftest_en = false;
   printf("Difftest disable\n");
+#endif
   return 0;
 }
 
 void difftest_sync();
 static int cmd_attach(char *args) {
+#ifdef CONFIG_DIFFTEST
   difftest_en = true;
   printf("Difftest enable\n");
   difftest_sync();
+#endif
   return 0;
 }
 

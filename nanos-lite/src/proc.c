@@ -26,7 +26,7 @@ void init_proc() {
 
   // load program here
   void naive_uload(PCB *pcb, const char *filename);
-  naive_uload(NULL, "/bin/161220016");
+  naive_uload(NULL, "/bin/nterm");
 }
 
 Context* schedule(Context *prev) {
