@@ -18,9 +18,12 @@
 #include <cpu/ifetch.h>
 #include <cpu/decode.h>
 
+#define INT128 0
 #define R(i) gpr(i)
 #define Mr vaddr_read
 #define Mw vaddr_write
+#define Csr csr_to_reg
+#define ECALL isa_raise_intr
 #define Shift32 4
 #define Shift64 5
 #define Shift MUXDEF(CONFIG_ISA64, Shift64, Shift32)
@@ -29,11 +32,44 @@
 enum {
   TYPE_R, TYPE_I, TYPE_S,
   TYPE_B, TYPE_U, TYPE_J,
-  TYPE_N, // none
+  TYPE_N, TYPE_C// none
 };
+#if INT128
+typedef struct {
+  uint64_t low;
+  uint64_t high;
+} uint128_t;
+
+static uint128_t multiply_uint64_to_uint128(uint64_t a, uint64_t b) {
+    uint128_t result = {0, 0};
+
+    uint64_t a_lo = (uint32_t)a;  // Lower 32 bits of a
+    uint64_t a_hi = a >> 32;      // Upper 32 bits of a
+    uint64_t b_lo = (uint32_t)b;  // Lower 32 bits of b
+    uint64_t b_hi = b >> 32;      // Upper 32 bits of b
+
+    // Multiply parts
+    uint64_t low_low = a_lo * b_lo;
+    uint64_t low_high = a_lo * b_hi;
+    uint64_t high_low = a_hi * b_lo;
+    uint64_t high_high = a_hi * b_hi;
+
+    // Sum up the products: careful with carries
+    uint64_t mid1 = low_high + (low_low >> 32);
+    uint64_t mid2 = high_low + (mid1 & 0xFFFFFFFF);
+
+    // Assemble the result
+    result.low = (mid2 << 32) | (low_low & 0xFFFFFFFF);
+    result.high = high_high + (mid1 >> 32) + (mid2 >> 32);
+
+    return result;
+}
+#define MULH64(src1, src2) multiply_uint64_to_uint128((src1), (src2)).low
+#endif
 
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
+#define uimm() do { *src1 = rs1; } while (0)
 #define immI() do { *imm = SEXT(BITS(i, 31, 20), 12); } while(0)
 #define immU() do { *imm = SEXT(BITS(i, 31, 12), 20) << 12; } while(0)
 #define immS() do { *imm = (SEXT(BITS(i, 31, 25), 7) << 5) | BITS(i, 11, 7); } while(0)
@@ -49,6 +85,29 @@ enum {
   ((src1) < 0 && src2 != 0) ? ({ word_t mask = ~((1 << (sizeof(word_t)*8-(src2))) - 1); ((src1) >> (src2) | mask); }) \
   : ((src1) >> (src2)) \
 )
+#define DIV(src1, src2) ( \
+  ((src2) != 0) ? ((((src1) == MUXDEF(CONFIG_ISA64, INT64_MIN, INT32_MIN)) && ((src2) == -1)) ? MUXDEF(CONFIG_ISA64, INT64_MIN, INT32_MIN) : ((src1) / (src2))) : -1 \
+)
+#define DIVU(src1, src2) ( \
+  ((src2) != 0) ? ((src1) / (src2)) : -1 \
+)
+#define REM(src1, src2) ( \
+  ((src2) != 0) ? ((((src1) == MUXDEF(CONFIG_ISA64, INT64_MIN, INT32_MIN)) && ((src2) == -1)) ? 0 : ((src1) % (src2))) : (src1) \
+)
+#define REMU(src1, src2) ( \
+  ((src2) != 0) ? ((src1) % (src2)) : (src1) \
+)
+
+static word_t *csr_to_reg(int csr) {
+  switch (csr) {
+  case MEPC:    return &cpu.mepc;
+  case MSTATUS: return &cpu.mstatus;
+  case MCAUSE:  return &cpu.mcause;
+  case MTVEC:   return &cpu.mtvec;
+  default: panic("%x csr don't implement", csr);
+  }
+  return NULL;
+}
 
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst.val;
@@ -58,6 +117,7 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
   switch (type) {
     case TYPE_R: src1R(); src2R();         break;
     case TYPE_I: src1R();          immI(); break;
+    case TYPE_C: uimm() ;          immI(); break;
     case TYPE_S: src1R(); src2R(); immS(); break;
     case TYPE_B: src1R(); src2R(); immB(); break;
     case TYPE_U:                   immU(); break;
@@ -71,7 +131,9 @@ static int decode_exec(Decode *s) {
   s->dnpc = s->snpc;
 
 
+  IFDEF(CONFIG_DIFFTEST, void difftest_skip_ref());
   IFDEF(CONFIG_FTRACE, void ftrace(int type, word_t pc, word_t dnpc));
+  IFDEF(CONFIG_ETRACE, void etrace(int type, word_t pc, word_t info));
 #define INSTPAT_INST(s) ((s)->isa.inst.val)
 #define INSTPAT_MATCH(s, name, type, ... /* execute body */ ) { \
   decode_operand(s, &rd, &src1, &src2, &imm, concat(TYPE_, type)); \
@@ -117,8 +179,8 @@ static int decode_exec(Decode *s) {
   INSTPAT("0100000 ????? ????? 101 ????? 01100 11", sra    , R, R(rd) = SRA((sword_t)src1, BITS(src2, Shift, 0)));
   INSTPAT("0000000 ????? ????? 110 ????? 01100 11", or     , R, R(rd) = src1 | src2);
   INSTPAT("0000000 ????? ????? 111 ????? 01100 11", and    , R, R(rd) = src1 & src2);
-  // INSTPAT("??????? ????? ????? 000 ????? 00011 11", fence);
-  // INSTPAT("0000000 00001 00000 000 00000 11100 11", ecall);
+  // INSTPAT("??????? ????? ????? 000 ????? 00011 11", fence  , I, );
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, s->dnpc = ECALL(MUXDEF(CONFIG_RVE, R(15), R(17)), s->pc); IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, MUXDEF(CONFIG_RVE, R(15), R(17)))));
   INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak , R, NEMUTRAP(s->pc, R(10))); // R(10) is $a0
   #ifdef CONFIG_ISA64
   /* RV64I */
@@ -138,29 +200,46 @@ static int decode_exec(Decode *s) {
   #ifdef CONFIG_ISA64
   /* RV64M */
   INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul    , R, R(rd) = src1 * src2);
-  INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh   , R, R(rd) = ((__int128_t)SEXT(src1, 64) * (__int128_t)SEXT(src2, 64)) >> 64);
-  INSTPAT("0000001 ????? ????? 010 ????? 01100 11", mulhsu , R, R(rd) = ((__int128_t)SEXT(src1, 64) * (__int128_t)src2) >> 64);
+  #if INT128
+  INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh   , R, R(rd) = MULH64((sword_t)src1, (sword_t)src2));
+  INSTPAT("0000001 ????? ????? 010 ????? 01100 11", mulhsu , R, R(rd) = MULH64((sword_t)src1, src2));
+  INSTPAT("0000001 ????? ????? 011 ????? 01100 11", mulhu  , R, R(rd) = MULH64(src1, src2));
+  #else
+  #define SEXT128(x, len) ({ struct { __int128_t n : len; } __x = { .n = x }; (__uint128_t)__x.n; })
+  INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh   , R, R(rd) = ((__int128_t)SEXT128(src1, 64) * (__int128_t)SEXT128(src2, 64)) >> 64);
+  INSTPAT("0000001 ????? ????? 010 ????? 01100 11", mulhsu , R, R(rd) = ((__int128_t)SEXT128(src1, 64) * (__int128_t)src2) >> 64);
   INSTPAT("0000001 ????? ????? 011 ????? 01100 11", mulhu  , R, R(rd) = ((__uint128_t)src1 * (__uint128_t)src2) >> 64);
-  INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div    , R, R(rd) = (sword_t)src1 / (sword_t)src2);
-  INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu   , R, R(rd) = src1 / src2);
-  INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem    , R, R(rd) = (sword_t)src1 % (sword_t)src2);
-  INSTPAT("0000001 ????? ????? 111 ????? 01100 11", remu   , R, R(rd) = src1 % src2);
+  #undef SEXT128
+  #endif
+  INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div    , R, R(rd) = DIV((sword_t)src1, (sword_t)src2));
+  INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu   , R, R(rd) = DIVU(src1, src2));
+  INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem    , R, R(rd) = REM((sword_t)src1, (sword_t)src2));
+  INSTPAT("0000001 ????? ????? 111 ????? 01100 11", remu   , R, R(rd) = REMU(src1, src2));
   INSTPAT("0000001 ????? ????? 000 ????? 01110 11", mulw   , R, R(rd) = SEXT32((uint32_t)src1 * (uint32_t)src2));
-  INSTPAT("0000001 ????? ????? 100 ????? 01110 11", divw   , R, R(rd) = SEXT32((int32_t)src1 / (int32_t)src2));
-  INSTPAT("0000001 ????? ????? 101 ????? 01110 11", divuw  , R, R(rd) = SEXT32((uint32_t)src1 / (uint32_t)src2));
-  INSTPAT("0000001 ????? ????? 110 ????? 01110 11", remw   , R, R(rd) = SEXT32((int32_t)src1 % (int32_t)src2));
-  INSTPAT("0000001 ????? ????? 111 ????? 01110 11", remuw  , R, R(rd) = SEXT32((uint32_t)src1 % (uint32_t)src2));
+  INSTPAT("0000001 ????? ????? 100 ????? 01110 11", divw   , R, R(rd) = SEXT32(DIV((int32_t)src1, (int32_t)src2)));
+  INSTPAT("0000001 ????? ????? 101 ????? 01110 11", divuw  , R, R(rd) = SEXT32(DIVU((uint32_t)src1, (uint32_t)src2)));
+  INSTPAT("0000001 ????? ????? 110 ????? 01110 11", remw   , R, R(rd) = SEXT32(REM((int32_t)src1, (int32_t)src2)));
+  INSTPAT("0000001 ????? ????? 111 ????? 01110 11", remuw  , R, R(rd) = SEXT32(REMU((uint32_t)src1, (uint32_t)src2)));
   #else
   /* RV32M */
   INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul    , R, R(rd) = src1 * src2);
   INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh   , R, R(rd) = ((int64_t)SEXT32(src1) * (int64_t)SEXT32(src2)) >> 32);
   INSTPAT("0000001 ????? ????? 010 ????? 01100 11", mulhsu , R, R(rd) = ((int64_t)SEXT32(src1) * (int64_t)src2) >> 32);
   INSTPAT("0000001 ????? ????? 011 ????? 01100 11", mulhu  , R, R(rd) = ((uint64_t)src1 * (uint64_t)src2) >> 32);
-  INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div    , R, R(rd) = (sword_t)src1 / (sword_t)src2);
-  INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu   , R, R(rd) = src1 / src2);
-  INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem    , R, R(rd) = (sword_t)src1 % (sword_t)src2);
-  INSTPAT("0000001 ????? ????? 111 ????? 01100 11", remu   , R, R(rd) = src1 % src2);
+  INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div    , R, R(rd) = DIV((sword_t)src1, (sword_t)src2));
+  INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu   , R, R(rd) = DIVU(src1, src2));
+  INSTPAT("0000001 ????? ????? 110 ????? 01100 11", rem    , R, R(rd) = REM((sword_t)src1, (sword_t)src2));
+  INSTPAT("0000001 ????? ????? 111 ????? 01100 11", remu   , R, R(rd) = REMU(src1, src2));
   #endif
+  /* Zicsr */
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, if (rd != 0) { R(rd) = *Csr(imm); }; *Csr(imm) = src1);
+  INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , I, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); R(rd) = *Csr(imm); *Csr(imm) |= src1);
+  INSTPAT("??????? ????? ????? 011 ????? 11100 11", csrrc  , I, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
+  INSTPAT("??????? ????? ????? 101 ????? 11100 11", csrrwi , C, if (rd != 0) { R(rd) = *Csr(imm); }; *Csr(imm) = src1);
+  INSTPAT("??????? ????? ????? 110 ????? 11100 11", csrrsi , C, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); R(rd) = *Csr(imm); *Csr(imm) |= src1);
+  INSTPAT("??????? ????? ????? 111 ????? 11100 11", csrrci , C, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
+  /* Machine-Mode Privileged Instructions */
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); s->dnpc = cpu.mepc; IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, s->dnpc)));
 
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));
   INSTPAT_END();

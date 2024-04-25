@@ -24,6 +24,7 @@
 #include "utils.h"
 
 static int is_batch_mode = false;
+IFDEF(CONFIG_DIFFTEST , static int difftest_en = false);
 
 static int cmd_help(char *args);
 static int cmd_c(char *args);
@@ -34,6 +35,8 @@ static int cmd_x(char *args);
 static int cmd_p(char *args);
 static int cmd_w(char *args);
 static int cmd_d(char *args);
+static int cmd_detach(char *args);
+static int cmd_attach(char *args);
 static int cmd_test(char *args);
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
@@ -80,6 +83,8 @@ static struct {
   { "w", "Set a watchpoint for EXPR", cmd_w },
   { "d", "Delete the watchpoint with serial number N", cmd_d },
   { "test", "Built-in test", cmd_test },
+  { "detach", "Detach difftest mode", cmd_detach },
+  { "attach", "Attach difftest mode", cmd_attach },
 
   /* TODO: Add more commands */
 
@@ -212,6 +217,28 @@ static int cmd_d(char *args) {
     printf("Unknown watchpoint '%d'\n", n);
   }
   return 0;
+}
+
+static int cmd_detach(char *args) {
+#ifdef CONFIG_DIFFTEST
+  difftest_en = false;
+  printf("Difftest disable\n");
+#endif
+  return 0;
+}
+
+void difftest_sync();
+static int cmd_attach(char *args) {
+#ifdef CONFIG_DIFFTEST
+  difftest_en = true;
+  printf("Difftest enable\n");
+  difftest_sync();
+#endif
+  return 0;
+}
+
+bool difftest_enable() {
+  return difftest_en;
 }
 
 static int cmd_test(char *args) {

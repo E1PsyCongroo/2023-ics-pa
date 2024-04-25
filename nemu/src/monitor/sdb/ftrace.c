@@ -1,7 +1,6 @@
 #include <elf.h>
 #include <stdlib.h>
 #include <debug.h>
-#include "sdb.h"
 typedef struct {
   char *fname;
   word_t fsize;
@@ -21,7 +20,7 @@ void init_ftrace(const char* elf_file) {
   /* read ELF header */
   concat3(Elf,N,_Ehdr) elf_ehdr;
   Assert(fread(&elf_ehdr, sizeof elf_ehdr, 1, fp) != sizeof elf_ehdr, "%s is not a elf file\n", elf_file);
-  Assert(!strncmp((char*)elf_ehdr.e_ident, "\x7f""ELF", 4), "%s is not a elf file\n", elf_file);
+  Assert(*(uint32_t*)elf_ehdr.e_ident == 0x464c457f, "%s is not a elf file\n", elf_file);
   /* read Section header */
   fseek(fp, elf_ehdr.e_shoff, SEEK_SET);
   concat3(Elf,N,_Shdr) elf_shdr[elf_ehdr.e_shnum];
@@ -66,24 +65,31 @@ void init_ftrace(const char* elf_file) {
   }
 }
 
-void ftrace(uint32_t instruction, word_t pc, word_t dnpc) {
-  static char* current_fun = NULL;
-  static int num_space = 0;
-  if (ftrace_table == NULL) { return; }
+char* trace_fun(word_t dnpc) {
+  if (ftrace_table == NULL) { return NULL; }
   for (size_t i = 0; i < ftrace_table_num; i++) {
-    if (dnpc >= ftrace_table[i].faddr && dnpc < ftrace_table[i].faddr + ftrace_table[i].fsize
-        && ftrace_table[i].fname != current_fun) {
-      if (BITS(instruction, 6, 0) == 0b1100111 && BITS(instruction, 19, 15) == 1) {
-        /* jalr ret type */
-        num_space = num_space == 0 ? 0 : num_space - 1;
-        log_write(ANSI_FMT(FMT_WORD ": %*sret[%s->%s]\n", ANSI_FG_YELLOW), pc, num_space, "", current_fun, ftrace_table[i].fname);
-      } else {
-        /* jal call type */
-        log_write(ANSI_FMT(FMT_WORD ": %*scall[%s@" FMT_WORD "]\n", ANSI_FG_YELLOW), pc, num_space, "", ftrace_table[i].fname, dnpc);
-        num_space += 1;
-      }
-      current_fun = ftrace_table[i].fname;
+    if (dnpc >= ftrace_table[i].faddr && dnpc < ftrace_table[i].faddr + ftrace_table[i].fsize) {
+      return ftrace_table[i].fname;
     }
   }
+  return NULL;
 }
 
+void ftrace(uint32_t instruction, word_t pc, word_t dnpc) {
+  static char *current_fun = NULL;
+  static int num_space = 0;
+  char *trace_name = trace_fun(dnpc);
+  if (trace_name == NULL) { trace_name = "???"; }
+  if (trace_name != current_fun) {
+    if (BITS(instruction, 6, 0) == 0b1100111 && BITS(instruction, 19, 15) == 1) {
+      /* jalr ret type */
+      num_space = num_space == 0 ? 0 : num_space - 1;
+      log_write(ANSI_FMT(FMT_WORD ": %*sret[%s->%s@" FMT_WORD "]\n", ANSI_FG_YELLOW), pc, num_space, "", current_fun, trace_name, dnpc);
+    } else {
+      /* jal call type */
+      log_write(ANSI_FMT(FMT_WORD ": %*scall[%s@" FMT_WORD "]\n", ANSI_FG_YELLOW), pc, num_space, "", trace_name, dnpc);
+      num_space += 1;
+    }
+    current_fun = trace_name;
+  }
+}

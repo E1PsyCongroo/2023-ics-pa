@@ -25,5 +25,6 @@ int delete_wp(int number);
 void wp_display();
 bool add_wp(char *e);
 bool scan_wp();
+bool difftest_enable();
 
 #endif

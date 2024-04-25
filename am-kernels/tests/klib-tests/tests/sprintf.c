@@ -185,6 +185,7 @@ struct {
     {"%p", (void *)0x12345678, "0x12345678", 10},
     {"%p", (void *)0x78abcdef, "0x78abcdef", 10},
     {"%p", (void *)0x123, "0x123", 5},
+    {"%p", (void *)0x0, "0x0", 3},
     {"%%%p", (void *)0x123, "%0x123", 6},
 };
 #define POINTERCASENUM ((sizeof pointer_test_case) / (sizeof pointer_test_case[0]))

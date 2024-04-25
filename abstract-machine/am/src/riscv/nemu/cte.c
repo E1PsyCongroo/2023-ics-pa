@@ -5,9 +5,25 @@
 static Context* (*user_handler)(Event, Context*) = NULL;
 
 Context* __am_irq_handle(Context *c) {
+#if debug_printf
+  for (size_t i = 0; i < NR_REGS; i++) {
+    printf("x%d\t0x%.8x\t", i, c->gpr[i]);
+    if (i % 2) { putch('\n'); }
+  }
+  printf("mcause\t0x%.8x\n", c->mcause);
+  printf("mstatus\t0x%.8x\n", c->mstatus);
+  printf("mepc\t0x%.8x\n", c->mepc);
+#endif
   if (user_handler) {
     Event ev = {0};
     switch (c->mcause) {
+      case -1: ev.event = EVENT_YIELD; break;
+      case 0: case 1: case 2: case 3:
+      case 4: case 5: case 6: case 7:
+      case 8: case 9: case 10: case 11:
+      case 12: case 13: case 14: case 15:
+      case 16: case 17: case 18: case 19:
+        ev.event = EVENT_SYSCALL; break;
       default: ev.event = EVENT_ERROR; break;
     }
 
