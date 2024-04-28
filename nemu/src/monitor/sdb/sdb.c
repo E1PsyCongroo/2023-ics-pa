@@ -238,7 +238,7 @@ static int cmd_attach(char *args) {
 }
 
 bool difftest_enable() {
-  return difftest_en;
+  return MUXDEF(CONFIG_DIFFTEST, difftest_en, false);
 }
 
 static int cmd_test(char *args) {

@@ -43,6 +43,7 @@ static uintptr_t loader(PCB *pcb, const char *filename) {
       memset(loader_ptr + elf_phdr[i].p_filesz, 0, elf_phdr[i].p_memsz - elf_phdr[i].p_filesz);
     }
   }
+  fs_close(fd);
   return elf_ehdr.e_entry;
 }
 
@@ -52,3 +53,28 @@ void naive_uload(PCB *pcb, const char *filename) {
   ((void(*)())entry) ();
 }
 
+void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
+  uintptr_t entry = loader(pcb, filename);
+  pcb->cp = ucontext(NULL, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
+  int argc = 0;
+  for (; argv[argc]; argc++) { continue; }
+  int envpc = 0;
+  for (; envp[envpc]; envpc++) { continue; }
+  int *u_argc = (int*)((uintptr_t)pcb->stack + 0x100);
+  *u_argc = argc;
+  char **u_argv = (char**)(u_argc + 1);
+  char **u_envp = (char**)(u_argv + argc + 1);
+  char *string_area = (char*)(u_envp + envpc + 1);
+  for (int i = 0; i < argc; i++) {
+    strcpy(string_area, argv[i]);
+    u_argv[i] = string_area;
+    string_area += strlen(string_area) + 1;
+  }
+  for (int i = 0; i < envpc; i++) {
+    strcpy(string_area, envp[i]);
+    u_envp[i] = string_area;
+    string_area += strlen(string_area) + 1;
+  }
+  pcb->cp->GPRx = (uintptr_t)u_argc;
+  Log("Load %s @ %p, user stack in [0x%08x, 0x%08x)", filename, entry, pcb->stack, pcb+1);
+}
