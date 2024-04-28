@@ -24,10 +24,14 @@ static void sh_prompt() {
 
 static void sh_handle_cmd(const char *cmd) {
   static char buf[256] = {};
+  static char* argv[32] = {};
+  int argc = 1;
   strncpy(buf, cmd, 255);
   buf[255] = 0;
-  char *filename = strtok(buf, "\n");
-  execvp(buf, NULL);
+  char *filename = strtok(buf, " \t\n");
+  argv[0] = filename;
+  while (argv[argc] = strtok(NULL, " \t\n")) { argc++; }
+  execvp(filename, argv);
 }
 
 void builtin_sh_run() {

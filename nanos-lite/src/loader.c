@@ -1,6 +1,7 @@
 #include <proc.h>
 #include <elf.h>
 #include <fs.h>
+#include <memory.h>
 
 #ifdef __LP64__
 # define Elf_Ehdr Elf64_Ehdr
@@ -56,25 +57,30 @@ void naive_uload(PCB *pcb, const char *filename) {
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
   uintptr_t entry = loader(pcb, filename);
   pcb->cp = ucontext(NULL, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
+  void *u_heap = new_page(8);
+  void *u_heap_end = (char *)u_heap + 8 * PGSIZE;
+  size_t string_size = 0;
   int argc = 0;
-  for (; argv[argc]; argc++) { continue; }
+  for (; argv[argc]; argc++) { string_size += strlen(argv[argc]) + 1; }
   int envpc = 0;
-  for (; envp[envpc]; envpc++) { continue; }
-  int *u_argc = (int*)((uintptr_t)pcb->stack + 0x100);
+  for (; envp[envpc]; envpc++) { string_size += strlen(envp[envpc]) + 1; }
+  char *string_area = (char*)u_heap_end - string_size;
+  char **u_envp = (char**)string_area - envpc - 1;
+  char **u_argv = (char**)u_envp - argc - 1;
+  int *u_argc = (int*)u_argv - 1;
   *u_argc = argc;
-  char **u_argv = (char**)(u_argc + 1);
-  char **u_envp = (char**)(u_argv + argc + 1);
-  char *string_area = (char*)(u_envp + envpc + 1);
   for (int i = 0; i < argc; i++) {
     strcpy(string_area, argv[i]);
     u_argv[i] = string_area;
     string_area += strlen(string_area) + 1;
   }
+  u_argv[argc] = NULL;
   for (int i = 0; i < envpc; i++) {
     strcpy(string_area, envp[i]);
     u_envp[i] = string_area;
     string_area += strlen(string_area) + 1;
   }
+  u_envp[envpc] = NULL;
   pcb->cp->GPRx = (uintptr_t)u_argc;
-  Log("Load %s @ %p, user stack in [0x%08x, 0x%08x)", filename, entry, pcb->stack, pcb+1);
+  Log("Load %s @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
 }

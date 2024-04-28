@@ -32,13 +32,15 @@ void init_proc() {
   Log("Initializing processes...");
 
   // load program here
-  context_kload(&pcb[0], hello_fun, "hello world");
-  // context_uload(&pcb[0], "/bin/hello");
-  context_uload(&pcb[1], "/bin/pal", (char *const[3]){"/bin/pal", "--skip", NULL }, (char *const[1]){ NULL });
+  // context_kload(&pcb[0], hello_fun, "hello world");
+  // context_uload(&pcb[0], "/bin/hello", (char *const[1]){ NULL }, (char *const[1]){ NULL });
+  // context_uload(&pcb[1], "/bin/pal", (char *const[3]){"/bin/pal", "--skip", NULL }, (char *const[1]){ NULL });
+  // context_uload(&pcb[0], "/bin/exec-test", (char *const[2]){ "/bin/exec-test", NULL }, (char *const[1]) { NULL });
+  context_uload(&pcb[0], "/bin/menu", (char *const[2]){ "/bin/menu", NULL }, (char *const[2]) { "PATH=/bin", NULL });
 }
 
 Context* schedule(Context *prev) {
   current->cp = prev;
-  current = (current == &pcb[0] ? &pcb[1] : &pcb[0]);
+  current = (current == &pcb[0] ? &pcb[0] : &pcb[0]);
   return current->cp;
 }
