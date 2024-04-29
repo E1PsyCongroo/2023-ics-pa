@@ -39,7 +39,7 @@ int sys_yield() {
   return 0;
 }
 void sys_exit(int status) {
-  sys_execve("/bin/nterm", (char *const[1]){ NULL }, (char *const[1]) { NULL });
+  sys_execve("/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
   halt(status);
 }
 int sys_brk(void *addr) {
@@ -52,15 +52,6 @@ int sys_gettimeofday(struct timeval *tv, struct timezone *tz) {
   return 0;
 }
 int sys_execve(const char *fname, char * const argv[], char *const envp[]) {
-  // printf("filename: %s\n", fname);
-  // printf("argc:\n");
-  // for (char **p = (char**)argv; *p; p++) {
-  //   printf("%s\n", *p);
-  // }
-  // printf("envp:\n");
-  // for (char **p = (char**)envp; *p; p++) {
-  //   printf("%s\n", *p);
-  // }
   context_uload(current, fname, argv, envp);
   switch_boot_pcb();
   yield();

@@ -33,10 +33,10 @@ void init_proc() {
 
   // load program here
   // context_kload(&pcb[0], hello_fun, "hello world");
-  // context_uload(&pcb[0], "/bin/hello", (char *const[1]){ NULL }, (char *const[1]){ NULL });
+  // context_uload(&pcb[0], "/bin/hello", (char *const[2]){ "/bin/hello", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[1], "/bin/pal", (char *const[3]){"/bin/pal", "--skip", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[0], "/bin/exec-test", (char *const[2]){ "/bin/exec-test", NULL }, (char *const[1]) { NULL });
-  context_uload(&pcb[0], "/bin/menu", (char *const[2]){ "/bin/menu", NULL }, (char *const[2]) { "PATH=/bin", NULL });
+  context_uload(&pcb[0], "/bin/menu", (char *const[2]){ "/bin/menu", NULL }, (char *const[1]) { NULL });
 }
 
 Context* schedule(Context *prev) {

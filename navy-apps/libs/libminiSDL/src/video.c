@@ -49,7 +49,7 @@ void SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, uint32_t color) {
     }
     if (color_index == palette->ncolors) {
       palette->ncolors++;
-      palette->colors = realloc(palette->colors, (palette->ncolors) * (sizeof (*palette->colors)));
+      // palette->colors = realloc(palette->colors, (palette->ncolors) * (sizeof (SDL_Color)));
       palette->colors[palette->ncolors-1] = sdl_color;
     }
     for (int i = 0; i < dst->h; i++) {
@@ -104,20 +104,18 @@ void SDL_UpdateRect(SDL_Surface *s, int x, int y, int w, int h) {
     if (x == 0 && y == 0 && w == 0 && h == 0) {
       NDL_DrawRect((void*)s->pixels, x, y, s->w, s->h);
     }
+    else if (w == s->w) {
+      NDL_DrawRect((void*)s->pixels, x, y, w, h);
+    }
     else {
-      if (w == s->w) {
-        NDL_DrawRect((void*)s->pixels, x, y, w, h);
+      uint32_t *pixels = malloc(w * h * sizeof(uint32_t));
+      int base = 0;
+      for (int i = 0; i < h; i++) {
+        memcpy(pixels + i*w, s->pixels + base, w * sizeof(uint32_t));
+        base += s->w;
       }
-      else {
-        uint32_t *pixels = malloc(w * h * sizeof(uint32_t));
-        int base = 0;
-        for (int i = 0; i < h; i++) {
-          memcpy(pixels + i*w, s->pixels + base, w * sizeof(uint32_t));
-          base += s->w;
-        }
-        NDL_DrawRect(pixels, x, y, w, h);
-        free(pixels);
-      }
+      NDL_DrawRect(pixels, x, y, w, h);
+      free(pixels);
     }
   }
   else {

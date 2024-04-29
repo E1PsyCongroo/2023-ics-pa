@@ -55,8 +55,6 @@ void naive_uload(PCB *pcb, const char *filename) {
 }
 
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
-  uintptr_t entry = loader(pcb, filename);
-  pcb->cp = ucontext(NULL, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
   void *u_heap = new_page(8);
   void *u_heap_end = (char *)u_heap + 8 * PGSIZE;
   size_t string_size = 0;
@@ -81,6 +79,8 @@ void context_uload(PCB *pcb, const char *filename, char *const argv[], char *con
     string_area += strlen(string_area) + 1;
   }
   u_envp[envpc] = NULL;
+  uintptr_t entry = loader(pcb, filename);
+  pcb->cp = ucontext(NULL, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
   pcb->cp->GPRx = (uintptr_t)u_argc;
   Log("Load %s @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
 }
