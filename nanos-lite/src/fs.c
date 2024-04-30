@@ -21,7 +21,7 @@ typedef struct {
   WriteFn write;
 } Finfo;
 
-enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_EVENTS, FD_DISINFO, FD_FB, FB_IOREAD, FB_IOWRITE};
+enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_EVENTS, FD_DISINFO, FD_FB, FB_IO};
 
 size_t invalid_read(void *buf, size_t offset, size_t len) {
   panic("should not reach here");
@@ -41,8 +41,7 @@ static Finfo file_table[] __attribute__((used)) = {
   [FD_EVENTS] = {"/dev/events", 0, 0, events_read, invalid_write},
   [FD_DISINFO] = {"/proc/dispinfo", 0, 0, dispinfo_read, invalid_write},
   [FD_FB] = {"/dev/fb", 0, 0, invalid_read, fb_write},
-  [FB_IOREAD] = {"/dev/ioeread", 0, 0, fs_ioe_read, invalid_write},
-  [FB_IOWRITE] = {"/dev/ioewrite", 0, 0, invalid_read, fs_ioe_write},
+  [FB_IO] = {"/dev/ioe", 0, 0, fs_ioe_read, fs_ioe_write},
 #include "files.h"
 };
 #define FILENUM (LENGTH(file_table) - 1)
