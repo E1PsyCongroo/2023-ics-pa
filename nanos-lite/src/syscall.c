@@ -52,6 +52,9 @@ int sys_gettimeofday(struct timeval *tv, struct timezone *tz) {
   return 0;
 }
 int sys_execve(const char *fname, char * const argv[], char *const envp[]) {
+  int fd = fs_open(fname, 0, 0);
+  if (fd == -1) { return -2; }
+  fs_close(fd);
   context_uload(current, fname, argv, envp);
   switch_boot_pcb();
   yield();

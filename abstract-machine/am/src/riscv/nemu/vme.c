@@ -71,7 +71,7 @@ void map(AddrSpace *as, void *va, void *pa, int prot) {
 
 Context *ucontext(AddrSpace *as, Area kstack, void *entry) {
   Context *c = (Context*)kstack.end - 1;
-  c->mepc = (uintptr_t)entry;
+  c->mepc = (uintptr_t)entry - 4;
   c->mcause = 0;
 #if __riscv_xlen == 32
   c->mstatus = 0x1800;

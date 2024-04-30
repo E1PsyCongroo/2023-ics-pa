@@ -48,7 +48,7 @@ bool cte_init(Context*(*handler)(Event, Context*)) {
 
 Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
   Context *c = (Context*)kstack.end - 1;
-  c->mepc = (uintptr_t)entry;
+  c->mepc = (uintptr_t)entry - 4;
   c->mcause = 0;
   c->gpr[10] = (uintptr_t)arg;
 #if __riscv_xlen == 32

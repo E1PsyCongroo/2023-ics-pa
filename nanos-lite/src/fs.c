@@ -60,7 +60,7 @@ int fs_open(const char *pathname, int flags, int mode) {
       return i;
     }
   }
-  panic("File %s doesn't exist", pathname);
+  // panic("File %s doesn't exist", pathname);
   return -1;
 }
 
