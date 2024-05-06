@@ -104,6 +104,7 @@ static word_t *csr_to_reg(int csr) {
   case MSTATUS: return &cpu.mstatus;
   case MCAUSE:  return &cpu.mcause;
   case MTVEC:   return &cpu.mtvec;
+  case SATP:    return &cpu.satp;
   default: panic("%x csr don't implement", csr);
   }
   return NULL;

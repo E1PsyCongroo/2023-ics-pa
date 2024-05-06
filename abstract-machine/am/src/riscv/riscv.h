@@ -29,6 +29,29 @@ enum { MODE_U, MODE_S, MODE_M = 3 };
 #else
 #define MSTATUS_SXL  0
 #define MSTATUS_UXL  0
+typedef union {
+  struct {
+    uint32_t V    : 1;
+    uint32_t R    : 1;
+    uint32_t W    : 1;
+    uint32_t X    : 1;
+    uint32_t U    : 1;
+    uint32_t G    : 1;
+    uint32_t A    : 1;
+    uint32_t D    : 1;
+    uint32_t RSW  : 2;
+    uint32_t PPN0 : 10;
+    uint32_t PPN1 : 12;
+  };
+  struct {
+    uint32_t      : 10;
+    uint32_t PPN  : 22;
+  };
+  uint32_t pte;
+} PTE32;
+
 #endif
+
+
 
 #endif

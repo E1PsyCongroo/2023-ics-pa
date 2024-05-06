@@ -9,6 +9,7 @@ void naive_uload(PCB *pcb, const char *filename);
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]);
 int sys_execve(const char *fname, char * const argv[], char *const envp[]);
 void switch_boot_pcb();
+int mm_brk(uintptr_t brk);
 
 #define STRACE_EN 0
 #if STRACE_EN
@@ -43,7 +44,7 @@ void sys_exit(int status) {
   halt(status);
 }
 int sys_brk(void *addr) {
-  return 0;
+  return mm_brk((uintptr_t)addr);
 }
 int sys_gettimeofday(struct timeval *tv, struct timezone *tz) {
   uint64_t us = io_read(AM_TIMER_UPTIME).us;
