@@ -69,18 +69,18 @@ void map(AddrSpace *as, void *va, void *pa, int prot) {
     ((uintptr_t)va >> 12) & 0x3ff,
     ((uintptr_t)va >> 22),
   };
-  PTE32 *pte = &(((PTE32*)(as->ptr))[vpn[1]]);
+  PTE32 *pte = &((PTE32*)(as->ptr))[vpn[1]];
   if (pte->V) {
-    pte = (PTE32 *)(pte->PPN << 10);
+    pte = (PTE32 *)(pte->PPN << 12);
   }
   else {
     void *new_page = pgalloc_usr(PGSIZE);
-    pte->PPN = (uintptr_t)new_page >> 10;
+    pte->PPN = (uintptr_t)new_page >> 12;
     pte->V = 1;
     pte = new_page;
   }
-  pte = &(pte[vpn[0]]);
-  pte->PPN = (uintptr_t)pa >> 10;
+  pte = &pte[vpn[0]];
+  pte->PPN = (uintptr_t)pa >> 12;
   pte->V = 1;
 }
 

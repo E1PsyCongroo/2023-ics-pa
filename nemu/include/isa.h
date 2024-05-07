@@ -41,6 +41,7 @@ int isa_exec_once(struct Decode *s);
 enum { MMU_DIRECT, MMU_TRANSLATE, MMU_FAIL };
 enum { MEM_TYPE_IFETCH, MEM_TYPE_READ, MEM_TYPE_WRITE };
 enum { MEM_RET_OK, MEM_RET_FAIL, MEM_RET_CROSS_PAGE };
+#undef isa_mmu_check
 #ifndef isa_mmu_check
 int isa_mmu_check(vaddr_t vaddr, int len, int type);
 #endif
