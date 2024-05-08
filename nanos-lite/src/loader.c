@@ -31,17 +31,42 @@ static uintptr_t loader(PCB *pcb, const char *filename) {
   Elf_Ehdr elf_ehdr;
   fs_read(fd, &elf_ehdr, sizeof elf_ehdr);
   assert(*(uint32_t*)(elf_ehdr.e_ident) == 0x464c457f);
-  assert(elf_ehdr.e_machine == EXPECT_TYPE);
   assert(elf_ehdr.e_phnum);
   Elf_Phdr elf_phdr[elf_ehdr.e_phnum];
   fs_lseek(fd, elf_ehdr.e_phoff, SEEK_SET);
   fs_read(fd, &elf_phdr, elf_ehdr.e_phentsize * elf_ehdr.e_phnum);
   for (size_t i = 0; i < elf_ehdr.e_phnum; i++) {
     if (elf_phdr[i].p_type == PT_LOAD) {
-      void *loader_ptr = (void*)elf_phdr[i].p_vaddr;
       fs_lseek(fd, elf_phdr[i].p_offset, SEEK_SET);
-      fs_read(fd, loader_ptr, elf_phdr[i].p_filesz);
-      memset(loader_ptr + elf_phdr[i].p_filesz, 0, elf_phdr[i].p_memsz - elf_phdr[i].p_filesz);
+      uint8_t *loader_ptr = (uint8_t*)elf_phdr[i].p_vaddr;
+      size_t filesz = elf_phdr[i].p_filesz;
+      size_t memsz = elf_phdr[i].p_memsz;
+      if ((uintptr_t)loader_ptr % PGSIZE) {
+        const uintptr_t page_offset = (uintptr_t)loader_ptr % PGSIZE;
+        const size_t readsz = PGSIZE - page_offset;
+        uint8_t *page = new_page(1);
+        fs_read(fd, page + page_offset, readsz);
+        DEBUG("%s(code & data) Map va(%p) -> pa(%p)", filename, loader_ptr, page);
+        map(&pcb->as, (void*)((uintptr_t)loader_ptr & ~0xfff), page, MMAP_READ | MMAP_WRITE);
+        loader_ptr = (uint8_t *)ROUNDUP((uintptr_t)loader_ptr, PGSIZE);
+      }
+      for (size_t currentsz = 0; currentsz < memsz; currentsz += PGSIZE) {
+        uint8_t *page = new_page(1);
+        if (currentsz + PGSIZE < filesz) {
+          fs_read(fd, page, PGSIZE);
+        }
+        else if (currentsz < filesz) {
+          const size_t file_readsz = filesz - currentsz;
+          fs_read(fd, page, file_readsz);
+          memset(page+file_readsz, 0, PGSIZE - file_readsz);
+        }
+        else {
+          memset(page, 0, PGSIZE);
+        }
+        DEBUG("%s(code & data) Map va(%p) -> pa(%p)", filename, loader_ptr, page);
+        map(&pcb->as, loader_ptr, page, MMAP_READ | MMAP_WRITE);
+        loader_ptr += PGSIZE;
+      }
     }
   }
   fs_close(fd);
@@ -55,7 +80,17 @@ void naive_uload(PCB *pcb, const char *filename) {
 }
 
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
+  DEBUG("Load %s @ pcb(%p)", filename, pcb);
+  protect(&pcb->as);
   void *u_heap = new_page(8);
+  uint8_t *pa = u_heap;
+  uint8_t *va = (uint8_t *)(pcb->as.area.end) - 8 * PGSIZE;
+  for (size_t i = 0; i < 8; i++) {
+    DEBUG("%s Stack Map va(%p) -> pa(%p)", filename, va, pa);
+    map(&pcb->as, va, pa, MMAP_READ | MMAP_WRITE);
+    va += PGSIZE;
+    pa += PGSIZE;
+  }
   void *u_heap_end = (char *)u_heap + 8 * PGSIZE;
   size_t string_size = 0;
   int argc = 0;
@@ -80,7 +115,17 @@ void context_uload(PCB *pcb, const char *filename, char *const argv[], char *con
   }
   u_envp[envpc] = NULL;
   uintptr_t entry = loader(pcb, filename);
-  pcb->cp = ucontext(NULL, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
-  pcb->cp->GPRx = (uintptr_t)u_argc;
-  Log("Load %s @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
+  pcb->cp = ucontext(&pcb->as, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
+
+  pa = u_heap;
+  va = (uint8_t *)(pcb->as.area.end) - 8 * PGSIZE;
+  for (size_t i = 0; i < 8; i++) {
+    if ((uintptr_t)u_argc >= (uintptr_t)pa && (uintptr_t)u_argc < (uintptr_t)pa + PGSIZE) {
+      pcb->cp->GPRx = (uintptr_t)va | ((uintptr_t)u_argc & 0xfff);
+      break;
+    }
+    va += PGSIZE;
+    pa += PGSIZE;
+  }
+  DEBUG("Load %s @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
 }

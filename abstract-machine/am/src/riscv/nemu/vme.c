@@ -93,5 +93,6 @@ Context *ucontext(AddrSpace *as, Area kstack, void *entry) {
 #else
   c->mstatus = 0xa00001800;
 #endif
+  c->pdir = as->ptr;
   return c;
 }

@@ -40,7 +40,7 @@ int sys_yield() {
   return 0;
 }
 void sys_exit(int status) {
-  sys_execve("/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
+  // sys_execve("/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
   halt(status);
 }
 int sys_brk(void *addr) {

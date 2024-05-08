@@ -48,17 +48,17 @@ int isa_mmu_check(vaddr_t vaddr, int len, int type) {
   };
   ptr = (PTE32 *)guest_to_host((uintptr_t)&ptr[vpn[1]]);
   if (!ptr->V) {
-    panic("first pte fail");
+    panic("(vaddr: 0x%08x, len: %d)first pte fail", vaddr, len);
     return MMU_FAIL;
   }
   ptr = (PTE32 *)((uintptr_t)ptr->PPN << 12);
   ptr = (PTE32 *)guest_to_host((uintptr_t)&ptr[vpn[0]]);
   if (!ptr->V) {
-    panic("second pte fail");
+    panic("(vaddr: 0x%08x, len: %d)second pte fail", vaddr, len);
     return MMU_FAIL;
   }
   if (ptr->PPN == (vaddr >> 12)) { return MMU_DIRECT; }
-  panic("kernel should be direct mapted");
+  // panic("kernel should be direct mapted");
   return MMU_TRANSLATE;
 }
 #endif
@@ -73,15 +73,15 @@ paddr_t isa_mmu_translate(vaddr_t vaddr, int len, int type) {
   };
   ptr = (PTE32 *)guest_to_host((uintptr_t)&ptr[vpn[1]]);
   if (!ptr->V) {
-    panic("first pte fail");
+    panic("(vaddr: 0x%08x, len: %d)first pte fail", vaddr, len);
     return MEM_RET_FAIL;
   }
   ptr = (PTE32 *)((uintptr_t)ptr->PPN << 12);
   ptr = (PTE32 *)guest_to_host((uintptr_t)&ptr[vpn[0]]);
   if (!ptr->V) {
-    panic("second pte fail");
+    panic("(vaddr: 0x%08x, len: %d)second pte fail", vaddr, len);
     return MEM_RET_FAIL;
   }
-  Assert(ptr->PPN == (vaddr >> 12), "kernel should be direct maped, but PPN: 0x%08x, vaddr: 0x%08x", ptr->PPN << 12, vaddr);
+  // Assert(ptr->PPN == (vaddr >> 12), "kernel should be direct maped, but PPN: 0x%08x, vaddr: 0x%08x", ptr->PPN << 12, vaddr);
   return (ptr->PPN << 12) | page_offset;
 }

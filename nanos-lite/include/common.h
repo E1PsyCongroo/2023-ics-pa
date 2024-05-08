@@ -6,6 +6,7 @@
 #define HAS_VME
 //#define MULTIPROGRAM
 //#define TIME_SHARING
+#define KDEBUG
 
 #include <am.h>
 #include <klib.h>
