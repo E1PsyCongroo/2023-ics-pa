@@ -11,7 +11,7 @@ int sys_execve(const char *fname, char * const argv[], char *const envp[]);
 void switch_boot_pcb();
 int mm_brk(uintptr_t brk);
 
-#define STRACE_EN 0
+#define STRACE_EN 1
 #if STRACE_EN
 #define syscall_log(format, ...) printf("\33[1;37m" format "\33[0m", ## __VA_ARGS__)
 static void strace(Context *c) {

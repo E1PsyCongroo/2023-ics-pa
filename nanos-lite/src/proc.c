@@ -37,11 +37,11 @@ void init_proc() {
   // context_kload(&pcb[0], hello_fun, "hello world");
   // context_uload(&pcb[0], "/bin/hello", (char *const[2]){ "/bin/hello", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[1], "/bin/typing-game", (char *const[2]){"/bin/typing-game", NULL }, (char *const[1]){ NULL });
-  context_uload(&pcb[0], "/bin/pal", (char *const[2]){"/bin/pal", NULL }, (char *const[1]){ NULL });
+  // context_uload(&pcb[0], "/bin/pal", (char *const[2]){"/bin/pal", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[0], "/bin/pal", (char *const[3]){"/bin/pal", "--skip", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[0], "/bin/exec-test", (char *const[2]){ "/bin/exec-test", NULL }, (char *const[1]) { NULL });
   // context_uload(&pcb[0], "/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
-  // context_uload(&pcb[0], "/bin/dummy", (char *const[2]){ "/bin/dummy", NULL }, (char *const[1]) { NULL });
+  context_uload(&pcb[0], "/bin/dummy", (char *const[2]){ "/bin/dummy", NULL }, (char *const[1]) { NULL });
 }
 
 Context* schedule(Context *prev) {
@@ -50,7 +50,7 @@ Context* schedule(Context *prev) {
     DEBUG("pcb_boot context store @ pcb_boot[%p]", current->cp);
   }
   else {
-    DEBUG("pcb[%d] context @ pcb[%d][%p]", current - &pcb[0], current - &pcb[0], current->cp);
+    DEBUG("pcb[%d] context store @ user stack[%p]", current - &pcb[0], current->cp);
   }
   PCB* p = current;
   current = (current == &pcb[0] ? &pcb[0] : &pcb[0]);
