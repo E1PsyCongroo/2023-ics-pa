@@ -80,8 +80,8 @@ void naive_uload(PCB *pcb, const char *filename) {
 }
 
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
-  DEBUG("Load %s @ pcb(%p)", filename, pcb);
   protect(&pcb->as);
+  DEBUG("Load %s @ pcb(%p).pdir(%p)", filename, pcb, pcb->as.ptr);
   void *u_heap = new_page(8);
   uint8_t *pa = u_heap;
   uint8_t *va = (uint8_t *)(pcb->as.area.end) - 8 * PGSIZE;

@@ -22,8 +22,56 @@ void free_page(void *p) {
   panic("not implement yet");
 }
 
+uintptr_t get_pa(void *pdir, uintptr_t va) {
+#ifdef HAS_VME
+  typedef union {
+    struct {
+      uint32_t V    : 1;
+      uint32_t R    : 1;
+      uint32_t W    : 1;
+      uint32_t X    : 1;
+      uint32_t U    : 1;
+      uint32_t G    : 1;
+      uint32_t A    : 1;
+      uint32_t D    : 1;
+      uint32_t RSW  : 2;
+      uint32_t PPN0 : 10;
+      uint32_t PPN1 : 12;
+    };
+    struct {
+      uint32_t      : 10;
+      uint32_t PPN  : 22;
+    };
+    uint32_t pte;
+  } PTE32;
+
+  if(pdir == NULL) { return va; }
+  PTE32 *ptr = pdir;
+  const uintptr_t page_offset = va & 0xfff;
+  const uintptr_t vpn[2] = {
+    (va >> 12) & 0x3ff,
+    (va >> 22),
+  };
+  ptr = (PTE32 *)(uintptr_t)&ptr[vpn[1]];
+  if (!ptr->V) {
+    panic("(vaddr: 0x%08x)first pte fail", va);
+  }
+  ptr = (PTE32 *)((uintptr_t)ptr->PPN << 12);
+  ptr = (PTE32 *)(uintptr_t)&ptr[vpn[0]];
+  if (!ptr->V) {
+    panic("(vaddr: 0x%08x)second pte fail", va);
+  }
+  DEBUG("at pdir(%p): va(0x%08x) -> pa(0x%08x)", pdir, va, (ptr->PPN << 12) | page_offset);
+  return (ptr->PPN << 12) | page_offset;
+#else
+  return va;
+#endif
+}
+
+
 /* The brk() system call handler. */
 int mm_brk(uintptr_t brk) {
+#ifdef HAS_VME
 extern PCB *current;
   if (current->max_brk == 0) {
     current->max_brk = ROUNDUP(brk, PGSIZE);
@@ -36,6 +84,7 @@ extern PCB *current;
     DEBUG("Heap Map va(%p) -> pa(%p)", (void*)current->max_brk, page);
     current->max_brk += PGSIZE;
   }
+#endif
   return 0;
 }
 

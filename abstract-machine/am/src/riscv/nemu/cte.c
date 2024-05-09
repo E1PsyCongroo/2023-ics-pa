@@ -7,15 +7,6 @@ void __am_get_cur_as(Context *c);
 void __am_switch(Context *c);
 
 Context* __am_irq_handle(Context *c) {
-#ifdef AMDEBUG
-  for (size_t i = 0; i < NR_REGS; i++) {
-    printf("x%d\t0x%.8x\t", i, c->gpr[i]);
-    if (i % 2) { putch('\n'); }
-  }
-  printf("mcause\t0x%.8x\n", c->mcause);
-  printf("mstatus\t0x%.8x\n", c->mstatus);
-  printf("mepc\t0x%.8x\n", c->mepc);
-#endif
   if (user_handler) {
     Event ev = {0};
     switch (c->mcause) {
@@ -33,7 +24,6 @@ Context* __am_irq_handle(Context *c) {
     assert(c != NULL);
   }
 
-  // printf("Context(%p, entry: 0x%08x, pidr: %p, &argc: 0x%08x)\n", c, c->mepc + 4, c->pdir, c->GPRx);
   return c;
 }
 

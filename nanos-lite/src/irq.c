@@ -10,9 +10,6 @@ static Context* do_event(Event e, Context* c) {
     // default: break;
     default: panic("Unhandled event ID = %d", e.event);
   }
-  if (c != ret) {
-    DEBUG("Change Context(%p) -> Context(%p, entry: 0x%08x, pidr: %p, &argc: 0x%08x)", c, ret, ret->mepc + 4, ret->pdir, ret->GPRx);
-  }
   return ret;
 }
 

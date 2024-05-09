@@ -34,6 +34,9 @@ bool vme_init(void* (*pgalloc_f)(int), void (*pgfree_f)(void*)) {
   for (i = 0; i < LENGTH(segments); i ++) {
     void *va = segments[i].start;
     for (; va < segments[i].end; va += PGSIZE) {
+      #ifdef AMDEBUG
+      printf("kernel map va(%p) -> pa(%p)\n", va, va);
+      #endif
       map(&kas, va, va, 0);
     }
   }
@@ -60,11 +63,15 @@ void __am_get_cur_as(Context *c) {
 
 void __am_switch(Context *c) {
   if (vme_enable && c->pdir != NULL) {
+  #ifdef AMDEBUG
+    printf("switch satp -> %p\n", c->pdir);
+  #endif
     set_satp(c->pdir);
   }
 }
 
 void map(AddrSpace *as, void *va, void *pa, int prot) {
+  if (as == NULL) { return; }
   const uint32_t vpn[2] = {
     ((uintptr_t)va >> 12) & 0x3ff,
     ((uintptr_t)va >> 22),

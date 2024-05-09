@@ -8,6 +8,7 @@
                 // examples: "arch/x86-qemu.h", "arch/native.h", ...
 
 // #define AMDEBUG
+
 // Memory protection flags
 #define MMAP_NONE  0x00000000 // no access
 #define MMAP_READ  0x00000001 // can read
