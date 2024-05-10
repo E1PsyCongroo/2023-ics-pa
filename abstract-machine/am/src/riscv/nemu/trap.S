@@ -60,9 +60,8 @@ __am_asm_trap:
   mv a0, sp
   jal __am_get_cur_as
   jal __am_irq_handle
-  mv s0, a0
+  mv sp, a0
   jal __am_switch
-  mv sp, s0
 
   LOAD t1, OFFSET_STATUS(sp)
   LOAD t2, OFFSET_EPC(sp)

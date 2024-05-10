@@ -61,7 +61,6 @@ uintptr_t get_pa(void *pdir, uintptr_t va) {
   if (!ptr->V) {
     panic("(vaddr: 0x%08x)second pte fail", va);
   }
-  DEBUG("at pdir(%p): va(0x%08x) -> pa(0x%08x)", pdir, va, (ptr->PPN << 12) | page_offset);
   return (ptr->PPN << 12) | page_offset;
 #else
   return va;
