@@ -28,6 +28,9 @@
 #define Shift64 5
 #define Shift MUXDEF(CONFIG_ISA64, Shift64, Shift32)
 #define SEXT32(x) SEXT(x, 32)
+#define MRET s->dnpc = cpu.mepc; \
+cpu.mstatus = (cpu.mstatus & ~0x8) | ((cpu.mstatus & 0x80) >> 4); \
+cpu.mstatus |= 0x80; \
 
 enum {
   TYPE_R, TYPE_I, TYPE_S,
@@ -240,7 +243,7 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? 110 ????? 11100 11", csrrsi , C, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); R(rd) = *Csr(imm); *Csr(imm) |= src1);
   INSTPAT("??????? ????? ????? 111 ????? 11100 11", csrrci , C, R(rd) = *Csr(imm); *Csr(imm) &= ~src1);
   /* Machine-Mode Privileged Instructions */
-  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); s->dnpc = cpu.mepc; IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, s->dnpc)));
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , R, IFDEF(CONFIG_DIFFTEST, difftest_skip_ref()); MRET; IFDEF(CONFIG_ETRACE, etrace(s->isa.inst.val, s->pc, s->dnpc)));
 
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));
   INSTPAT_END();

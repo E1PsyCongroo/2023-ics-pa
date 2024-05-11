@@ -17,6 +17,7 @@ Context* __am_irq_handle(Context *c) {
       case 12: case 13: case 14: case 15:
       case 16: case 17: case 18: case 19:
         ev.event = EVENT_SYSCALL; break;
+      case 0x80000007: ev.event = EVENT_IRQ_TIMER; break;
       default: ev.event = EVENT_ERROR; break;
     }
 
@@ -45,9 +46,9 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
   c->mcause = 0;
   c->gpr[10] = (uintptr_t)arg;
 #if __riscv_xlen == 32
-  c->mstatus = 0x1800;
+  c->mstatus = 0x1880;
 #else
-  c->mstatus = 0xa00001800;
+  c->mstatus = 0xa00001880;
 #endif
   c->pdir = NULL;
   return c;

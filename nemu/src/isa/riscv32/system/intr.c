@@ -21,9 +21,17 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
    */
   cpu.mepc = epc;
   cpu.mcause = NO;
+  cpu.mstatus = (cpu.mstatus & ~0x80) | ((cpu.mstatus & 0x8) << 4);
+  cpu.mstatus &= ~0x8;
+  // printf("receive interputer: cpu.mstatus: 0x%08x\n", cpu.mstatus);
   return cpu.mtvec;
 }
 
+#define IRQ_TIMER 0x80000007  // for riscv32
 word_t isa_query_intr() {
+  if (cpu.intr && (cpu.mstatus & 0x8)) {
+    cpu.intr = false;
+    return IRQ_TIMER;
+  }
   return INTR_EMPTY;
 }

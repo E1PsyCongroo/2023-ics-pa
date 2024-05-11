@@ -11,8 +11,8 @@ size_t serial_write(const void *buf, size_t offset, size_t len);
 size_t events_read(void *buf, size_t offset, size_t len);
 size_t dispinfo_read(void *buf, size_t offset, size_t len);
 size_t fb_write(const void *buf, size_t offset, size_t len);
-size_t fs_ioe_read(void *buf, size_t offset, size_t len) { yield(); ioe_read(offset, buf); return len; }
-size_t fs_ioe_write(const void *buf, size_t offset, size_t len) { yield(); ioe_write(offset, (void*)buf); return len;}
+size_t fs_ioe_read(void *buf, size_t offset, size_t len) { ioe_read(offset, buf); return len; }
+size_t fs_ioe_write(const void *buf, size_t offset, size_t len) { ioe_write(offset, (void*)buf); return len;}
 typedef struct {
   char *name;
   size_t size;

@@ -96,9 +96,9 @@ Context *ucontext(AddrSpace *as, Area kstack, void *entry) {
   c->mepc = (uintptr_t)entry - 4;
   c->mcause = 0;
 #if __riscv_xlen == 32
-  c->mstatus = 0x1800;
+  c->mstatus = 0x1880;
 #else
-  c->mstatus = 0xa00001800;
+  c->mstatus = 0xa00001880;
 #endif
   c->pdir = as->ptr;
   return c;

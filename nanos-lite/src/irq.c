@@ -5,6 +5,7 @@ void do_syscall(Context *c);
 static Context* do_event(Event e, Context* c) {
   Context *ret = c;
   switch (e.event) {
+    case EVENT_IRQ_TIMER: DEBUG("timer"); Log("receive timer-interputer"); ret = schedule(c); break;
     case EVENT_YIELD: DEBUG("yield"); ret = schedule(c); break;
     case EVENT_SYSCALL: DEBUG("syscalls"); do_syscall(c); break;
     // default: break;
