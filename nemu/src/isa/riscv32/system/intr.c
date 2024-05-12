@@ -23,7 +23,6 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   cpu.mcause = NO;
   cpu.mstatus = (cpu.mstatus & ~0x80) | ((cpu.mstatus & 0x8) << 4);
   cpu.mstatus &= ~0x8;
-  // printf("receive interputer: cpu.mstatus: 0x%08x\n", cpu.mstatus);
   return cpu.mtvec;
 }
 

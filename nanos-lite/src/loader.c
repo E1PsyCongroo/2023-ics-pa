@@ -82,8 +82,8 @@ void naive_uload(PCB *pcb, const char *filename) {
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
   protect(&pcb->as);
   DEBUG("Load %s @ pcb(%p).pdir(%p)", filename, pcb, pcb->as.ptr);
-  void *u_heap = new_page(8);
-  uint8_t *pa = u_heap;
+  void *uarea = new_page(8);
+  uint8_t *pa = uarea;
   uint8_t *va = (uint8_t *)(pcb->as.area.end) - 8 * PGSIZE;
   for (size_t i = 0; i < 8; i++) {
     DEBUG("%s Stack Map va(%p) -> pa(%p)", filename, va, pa);
@@ -91,13 +91,13 @@ void context_uload(PCB *pcb, const char *filename, char *const argv[], char *con
     va += PGSIZE;
     pa += PGSIZE;
   }
-  void *u_heap_end = (char *)u_heap + 8 * PGSIZE;
+  void *uarea_end = (char *)uarea + 8 * PGSIZE;
   size_t string_size = 0;
   int argc = 0;
   for (; argv[argc]; argc++) { string_size += strlen(argv[argc]) + 1; }
   int envpc = 0;
   for (; envp[envpc]; envpc++) { string_size += strlen(envp[envpc]) + 1; }
-  char *string_area = (char*)u_heap_end - string_size;
+  char *string_area = (char*)uarea_end - string_size;
   char **u_envp = (char**)string_area - envpc - 1;
   char **u_argv = (char**)u_envp - argc - 1;
   int *u_argc = (int*)u_argv - 1;
@@ -117,7 +117,7 @@ void context_uload(PCB *pcb, const char *filename, char *const argv[], char *con
   uintptr_t entry = loader(pcb, filename);
   pcb->cp = ucontext(&pcb->as, (Area){.start=pcb->stack, .end=pcb+1}, (void*)entry);
 
-  pa = u_heap;
+  pa = uarea;
   va = (uint8_t *)(pcb->as.area.end) - 8 * PGSIZE;
   for (size_t i = 0; i < 8; i++) {
     if ((uintptr_t)u_argc >= (uintptr_t)pa && (uintptr_t)u_argc < (uintptr_t)pa + PGSIZE) {
@@ -127,5 +127,5 @@ void context_uload(PCB *pcb, const char *filename, char *const argv[], char *con
     va += PGSIZE;
     pa += PGSIZE;
   }
-  DEBUG("Load %s @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
+  DEBUG("Load %s: entry @ %p, user stack top @ 0x%08x", filename, entry, (void*)pcb->cp->GPRx);
 }

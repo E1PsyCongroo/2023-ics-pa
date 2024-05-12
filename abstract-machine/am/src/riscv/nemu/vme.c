@@ -64,7 +64,11 @@ void __am_get_cur_as(Context *c) {
 void __am_switch(Context *c) {
   if (vme_enable && c->pdir != NULL) {
   #ifdef AMDEBUG
-    printf("switch satp -> %p\n", c->pdir);
+    static void *last_pdir = NULL;
+    if (last_pdir != c->pdir) {
+      printf("switch satp -> %p\n", c->pdir);
+      last_pdir = c->pdir;
+    }
   #endif
     set_satp(c->pdir);
   }
