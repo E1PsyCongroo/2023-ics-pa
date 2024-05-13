@@ -33,7 +33,7 @@ static inline const char* reg_name(int idx) {
 enum {
   MEPC = 0x341      , MSTATUS = 0x300,
   MCAUSE = 0x342    , MTVEC = 0x305,
-  SATP = 0x180      ,
+  MSCRATCH = 0x340  , SATP = 0x180      ,
 };
 
 #endif

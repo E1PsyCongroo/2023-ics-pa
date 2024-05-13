@@ -31,26 +31,44 @@ f(30) f(31)
 #define PUSH(n) STORE concat(x, n), (n * XLEN)(sp);
 #define POP(n)  LOAD  concat(x, n), (n * XLEN)(sp);
 
-#define CONTEXT_SIZE  ((NR_REGS + 3) * XLEN)
+#define CONTEXT_SIZE  ((NR_REGS + 5) * XLEN)
 #define OFFSET_SP     ( 2 * XLEN)
 #define OFFSET_CAUSE  ((NR_REGS + 0) * XLEN)
 #define OFFSET_STATUS ((NR_REGS + 1) * XLEN)
 #define OFFSET_EPC    ((NR_REGS + 2) * XLEN)
+#define OFFSET_SATP   ((NR_REGS + 3) * XLEN)
+#define OFFSET_NP     ((NR_REGS + 4) * XLEN)
 
 .align 3
 .globl __am_asm_trap
 __am_asm_trap:
-  addi sp, sp, -CONTEXT_SIZE
+  csrrw sp, mscratch, sp      // (1) atomically exchange sp and mscratch
+  bnez sp, user_save          // (2) take the branch if we trapped from user
+  csrr sp, mscratch           // (3) if we trapped from kernel, restore the original sp
+  addi sp, sp, -CONTEXT_SIZE  // pp == KERNEL
+  STORE zero, OFFSET_NP(sp)   // c->np = KERNEL
+  j save_context
 
-  MAP(REGS, PUSH)
+user_save:                    // pp == USER
+  addi sp, sp, -CONTEXT_SIZE
+  PUSH(5)
+  addi t0, zero, 1
+  STORE t0, OFFSET_NP(sp)     // c->np = USER
+  POP(5)
+
+save_context:
+  MAP(REGS, PUSH)             // c->gpr = gpr
+  csrr t0, mscratch
+  STORE t0, OFFSET_SP(sp)     // c->gpr[sp] = $sp
+  csrw mscratch, zero         // ksp = 0
 
   csrr t0, mcause
   csrr t1, mstatus
   csrr t2, mepc
 
-  STORE t0, OFFSET_CAUSE(sp)
-  STORE t1, OFFSET_STATUS(sp)
-  STORE t2, OFFSET_EPC(sp)
+  STORE t0, OFFSET_CAUSE(sp)  // c->mcause = $mcause
+  STORE t1, OFFSET_STATUS(sp) // c->mstatus = $mstatus
+  STORE t2, OFFSET_EPC(sp)    // c->mepc = $mepc
 
   # set mstatus.MPRV to pass difftest
   li a0, (1 << 17)
@@ -58,18 +76,22 @@ __am_asm_trap:
   csrw mstatus, t1
 
   mv a0, sp
-  jal __am_get_cur_as
   jal __am_irq_handle
   mv sp, a0
-  jal __am_switch
 
+  LOAD t0, OFFSET_NP(sp)
   LOAD t1, OFFSET_STATUS(sp)
   LOAD t2, OFFSET_EPC(sp)
   addi t2, t2, 4
-  csrw mstatus, t1
-  csrw mepc, t2
+  csrw mstatus, t1            // $mstatus = c->mstatus
+  csrw mepc, t2               // $mepc = c->mepc + 4
+  beqz t0, skip_save_ksp
+  addi t0, sp, CONTEXT_SIZE
+  csrw mscratch, t0           // ksp = $sp
 
-  MAP(REGS, POP)
+skip_save_ksp:
+  MAP(REGS, POP)              // gpr = c->gpr
 
   addi sp, sp, CONTEXT_SIZE
+  LOAD sp, (-CONTEXT_SIZE+OFFSET_SP)(sp)    // $sp = c->gpr[sp]
   mret

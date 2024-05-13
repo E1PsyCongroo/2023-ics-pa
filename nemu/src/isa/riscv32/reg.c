@@ -33,6 +33,7 @@ void isa_reg_display() {
   printf("mepc\t" FMT_WORD "\n", cpu.mepc);
   printf("mcause\t" FMT_WORD "\n", cpu.mcause);
   printf("mtvec\t" FMT_WORD "\n", cpu.mtvec);
+  printf("mscratch\t" FMT_WORD "\n", cpu.mscratch);
   printf("satp\t" FMT_WORD "\n", cpu.satp);
 }
 word_t isa_reg_str2val(const char *s, bool *success) {
