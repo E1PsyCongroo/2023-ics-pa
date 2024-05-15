@@ -42,10 +42,10 @@ void init_proc() {
   // context_uload(&pcb[0], "/bin/typing-game", (char *const[2]){"/bin/typing-game", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[0], "/bin/bird", (char *const[2]){"/bin/bird", NULL }, (char *const[1]){ NULL });
   // context_uload(&pcb[0], "/bin/fceux", (char *const[3]){"/bin/fceux", "/share/games/nes/mario.nes", NULL }, (char *const[1]){ NULL });
-  // context_uload(&pcb[0], "/bin/pal", (char *const[3]){"/bin/pal", "--skip", NULL }, (char *const[1]){ NULL });
-  // context_uload(&pcb[0], "/bin/exec-test", (char *const[2]){ "/bin/exec-test", NULL }, (char *const[1]) { NULL });
-  context_uload(&pcb[1], "/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
-  context_uload(&pcb[0], "/bin/hello", (char *const[2]){ "/bin/hello", NULL }, (char *const[1]) { NULL });
+  // context_uload(&pcb[0], "/bin/pal", (char *const[2]){"/bin/pal", NULL }, (char *const[1]){ NULL });
+  // context_uload(&pcb[0], "/bin/timer-test", (char *const[2]){ "/bin/timer-test", NULL }, (char *const[1]) { NULL });
+  context_uload(&pcb[0], "/bin/nterm", (char *const[2]){ "/bin/nterm", NULL }, (char *const[1]) { NULL });
+  context_uload(&pcb[1], "/bin/hello", (char *const[2]){ "/bin/hello", NULL }, (char *const[1]) { NULL });
 }
 
 Context* schedule(Context *prev) {

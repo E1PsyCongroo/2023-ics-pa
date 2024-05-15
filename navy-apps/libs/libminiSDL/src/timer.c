@@ -12,7 +12,7 @@ int SDL_RemoveTimer(SDL_TimerID id) {
 
 extern uint32_t init_us;
 uint32_t SDL_GetTicks() {
-  return NDL_GetTicks() / 1000 - init_us;
+  return NDL_GetTicks() - init_us;
 }
 
 void SDL_Delay(uint32_t ms) {

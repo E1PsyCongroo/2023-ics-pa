@@ -8,7 +8,7 @@ int main() {
   uint32_t us_old = NDL_GetTicks();
   while (1) {
     uint32_t us_new = NDL_GetTicks();
-    if (us_new - us_old > 500000) {
+    if (us_new - us_old > 500) {
       us_old =  us_new;
       printf("Timer-test: after 0.5s\n");
     }

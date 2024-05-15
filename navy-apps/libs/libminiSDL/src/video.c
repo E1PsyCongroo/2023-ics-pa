@@ -14,11 +14,15 @@ void SDL_BlitSurface(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_
   int w = src->w, h = src->h;
   int base_dst = 0, base_src = 0;
   if (srcrect) {
+    assert(srcrect->y < src->h);
+    assert(srcrect->x < src->w);
     base_src = ((srcrect->y * src->w) + srcrect->x) * BytesPerPixel;
     w = srcrect->w;
     h = srcrect->h;
   }
   if (dstrect) {
+    assert(dstrect->y < dst->h);
+    assert(dstrect->x < dst->w);
     base_dst = ((dstrect->y * dst->w) + dstrect->x) * BytesPerPixel;
   }
   for (int i = 0; i < h; i++) {

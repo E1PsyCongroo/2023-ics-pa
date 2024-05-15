@@ -2,7 +2,7 @@
 uint32_t init_us;
 int SDL_Init(uint32_t flags) {
   int ret = NDL_Init(flags);
-  init_us = NDL_GetTicks() / 1000;
+  init_us = NDL_GetTicks();
   return ret;
 }
 

@@ -15,7 +15,7 @@ static int system_w = 0, system_h = 0;
 uint32_t NDL_GetTicks() {
   struct timeval now;
   gettimeofday(&now, NULL);
-  return now.tv_sec * 1000000 + now.tv_usec;
+  return now.tv_sec * 1000 + now.tv_usec / 1000;
 }
 int NDL_PollEvent(char *buf, int len) {
   int valid = read(evtdev, buf, len);

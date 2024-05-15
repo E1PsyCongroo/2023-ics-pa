@@ -41,16 +41,19 @@ static uintptr_t loader(PCB *pcb, const char *filename) {
       uint8_t *loader_ptr = (uint8_t*)elf_phdr[i].p_vaddr;
       size_t filesz = elf_phdr[i].p_filesz;
       size_t memsz = elf_phdr[i].p_memsz;
+      size_t currentsz = 0;
       if ((uintptr_t)loader_ptr % PGSIZE) {
         const uintptr_t page_offset = (uintptr_t)loader_ptr % PGSIZE;
         const size_t readsz = PGSIZE - page_offset;
         uint8_t *page = new_page(1);
+        memset(page, 0, page_offset);
         fs_read(fd, page + page_offset, readsz);
         DEBUG("%s(code & data) Map va(%p) -> pa(%p)", filename, loader_ptr, page);
         map(&pcb->as, (void*)((uintptr_t)loader_ptr & ~0xfff), page, MMAP_READ | MMAP_WRITE);
         loader_ptr = (uint8_t *)ROUNDUP((uintptr_t)loader_ptr, PGSIZE);
+        currentsz = readsz;
       }
-      for (size_t currentsz = 0; currentsz < memsz; currentsz += PGSIZE) {
+      for (; currentsz < memsz; currentsz += PGSIZE) {
         uint8_t *page = new_page(1);
         if (currentsz + PGSIZE < filesz) {
           fs_read(fd, page, PGSIZE);
@@ -81,6 +84,7 @@ void naive_uload(PCB *pcb, const char *filename) {
 
 void context_uload(PCB *pcb, const char *filename, char *const argv[], char *const envp[]) {
   protect(&pcb->as);
+  pcb->max_brk = 0;
   DEBUG("Load %s @ pcb(%p).pdir(%p)", filename, pcb, pcb->as.ptr);
   void *uarea = new_page(8);
   uint8_t *pa = uarea;
