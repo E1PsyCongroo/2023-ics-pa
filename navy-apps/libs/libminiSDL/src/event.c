@@ -63,5 +63,5 @@ uint8_t* SDL_GetKeyState(int *numkeys) {
   if (numkeys) {
     *numkeys = KEYSCOUNT;
   }
-  return &keystate;
+  return (uint8_t*)&keystate;
 }

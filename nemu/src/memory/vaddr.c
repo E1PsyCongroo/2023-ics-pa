@@ -52,8 +52,8 @@ word_t vaddr_read(vaddr_t addr, int len) {
 }
 
 void vaddr_write(vaddr_t addr, int len, word_t data) {
-#ifdef CONFIG_MTRACE
-  if (MTRACE_COND) { log_write(ANSI_FMT("Write pmem:\t@" FMT_PADDR ", len=%2d, data=" FMT_WORD "\n", ANSI_FG_CYAN), addr, len, data); }
+#ifdef config_mtrace
+  if (MTRACE_COND) { log_write(ansi_fmt("write pmem:\t@" FMT_PADDR ", len=%2d, data=" FMT_WORD "\n", ANSI_FG_CYAN), addr, len, data); }
 #endif
   if (cpu.satp >> 31) {
     switch (isa_mmu_check(addr, len, MEM_TYPE_WRITE)) {
